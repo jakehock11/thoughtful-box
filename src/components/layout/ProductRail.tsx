@@ -5,6 +5,7 @@ import { useProductContext } from "@/contexts/ProductContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ThemeToggle } from "@/components/theme";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ProductRail() {
@@ -85,7 +86,7 @@ export function ProductRail() {
       </div>
 
       {/* Create Product Button */}
-      <div className="mt-3">
+      <div className="mt-3 flex flex-col items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -99,6 +100,9 @@ export function ProductRail() {
           </TooltipTrigger>
           <TooltipContent side="right">Create Product</TooltipContent>
         </Tooltip>
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
       </div>
     </div>
   );

@@ -21,6 +21,8 @@ import ArtifactsPage from "./pages/ArtifactsPage";
 import ArtifactDetailPage from "./pages/ArtifactDetailPage";
 import TimelinePage from "./pages/TimelinePage";
 import TaxonomyPage from "./pages/TaxonomyPage";
+import ExportsPage from "./pages/ExportsPage";
+import SettingsPage from "./pages/SettingsPage";
 import QuickCaptureDetailPage from "./pages/QuickCaptureDetailPage";
 import NotFound from "./pages/NotFound";
 
@@ -51,6 +53,8 @@ const App = () => (
                 <Route path="/product/:productId/artifacts/:id" element={<ArtifactDetailPage />} />
                 <Route path="/product/:productId/timeline" element={<TimelinePage />} />
                 <Route path="/product/:productId/taxonomy" element={<TaxonomyPage />} />
+                <Route path="/product/:productId/exports" element={<ExportsPage />} />
+                <Route path="/product/:productId/settings" element={<SettingsPage />} />
                 <Route path="/product/:productId/quick-captures/:id" element={<QuickCaptureDetailPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
