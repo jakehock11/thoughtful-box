@@ -67,7 +67,7 @@ export default function HypothesisDetailPage() {
     }
   }, [entity]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (navigateAfter = false) => {
     if (!entity || entity.type !== "hypothesis") return;
     setSaveStatus("saving");
     try {
@@ -81,18 +81,22 @@ export default function HypothesisDetailPage() {
         linkedIds,
       } as Hypothesis);
       setSaveStatus("saved");
-      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
-      savedTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      if (navigateAfter) {
+        navigate(`/product/${productId}/hypotheses`);
+      } else {
+        if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+        savedTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      }
     } catch {
       setSaveStatus("idle");
       toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
     }
-  }, [entity, title, body, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast]);
+  }, [entity, title, body, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast, navigate, productId]);
 
   useEffect(() => {
     if (!entity) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(handleSave, 1000);
+    saveTimeoutRef.current = setTimeout(() => handleSave(false), 1000);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -171,7 +175,7 @@ export default function HypothesisDetailPage() {
               Saved
             </span>
           )}
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={saveStatus === "saving"}>
+          <Button variant="outline" size="sm" onClick={() => handleSave(true)} disabled={saveStatus === "saving"}>
             <Save className="mr-2 h-4 w-4" />
             Save
           </Button>
