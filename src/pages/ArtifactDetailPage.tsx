@@ -1,0 +1,325 @@
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Trash2, Link as LinkIcon, ExternalLink } from "lucide-react";
+import { useProductContext } from "@/contexts/ProductContext";
+import { useEntity, useUpdateEntity, useDeleteEntity } from "@/hooks/useEntities";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { RichTextEditor } from "@/components/editor";
+import { ContextTagsPicker } from "@/components/taxonomy";
+import { LinkToModal, LinkedItems } from "@/components/linking";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
+import type { Artifact, ArtifactType, EntityType, LinkedIds } from "@/lib/db";
+
+const ARTIFACT_TYPE_OPTIONS: { value: ArtifactType; label: string }[] = [
+  { value: "note", label: "Note" },
+  { value: "link", label: "Link" },
+  { value: "image", label: "Image" },
+  { value: "file", label: "File" },
+  { value: "query", label: "Query" },
+];
+
+export default function ArtifactDetailPage() {
+  const { productId, id } = useParams<{ productId: string; id: string }>();
+  const navigate = useNavigate();
+  const { setCurrentProduct } = useProductContext();
+  const { data: entity, isLoading } = useEntity(id);
+  const updateEntity = useUpdateEntity();
+  const deleteEntity = useDeleteEntity();
+  const { toast } = useToast();
+
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [artifactType, setArtifactType] = useState<ArtifactType>("note");
+  const [source, setSource] = useState("");
+  const [personaIds, setPersonaIds] = useState<string[]>([]);
+  const [featureAreaIds, setFeatureAreaIds] = useState<string[]>([]);
+  const [dimensionValues, setDimensionValues] = useState<Record<string, string[]>>({});
+  const [linkedIds, setLinkedIds] = useState<LinkedIds>({});
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(true);
+
+  useEffect(() => {
+    if (productId) setCurrentProduct(productId);
+  }, [productId, setCurrentProduct]);
+
+  useEffect(() => {
+    if (entity && entity.type === "artifact") {
+      const artifact = entity as Artifact;
+      setTitle(artifact.title);
+      setBody(artifact.body);
+      setArtifactType(artifact.artifactType);
+      setSource(artifact.source || "");
+      setPersonaIds(artifact.personaIds);
+      setFeatureAreaIds(artifact.featureAreaIds);
+      setDimensionValues(artifact.dimensionValueIdsByDimension);
+      setLinkedIds(artifact.linkedIds || {});
+    }
+  }, [entity]);
+
+  const handleSave = useCallback(async () => {
+    if (!entity || entity.type !== "artifact") return;
+    try {
+      await updateEntity.mutateAsync({
+        ...entity,
+        title,
+        body,
+        artifactType,
+        source: source || undefined,
+        personaIds,
+        featureAreaIds,
+        dimensionValueIdsByDimension: dimensionValues,
+        linkedIds,
+      } as Artifact);
+    } catch {
+      toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
+    }
+  }, [entity, title, body, artifactType, source, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast]);
+
+  useEffect(() => {
+    if (!entity) return;
+    const timeout = setTimeout(handleSave, 1000);
+    return () => clearTimeout(timeout);
+  }, [title, body, artifactType, source, personaIds, featureAreaIds, dimensionValues, linkedIds]);
+
+  const handleDelete = async () => {
+    if (!id) return;
+    try {
+      await deleteEntity.mutateAsync(id);
+      toast({ title: "Deleted" });
+      navigate(`/product/${productId}/artifacts`);
+    } catch {
+      toast({ title: "Error", variant: "destructive" });
+    }
+  };
+
+  const handleLink = (entityId: string, entityType: EntityType) => {
+    const key = getLinkedIdsKey(entityType);
+    setLinkedIds((prev) => ({
+      ...prev,
+      [key]: [...(prev[key] || []), entityId],
+    }));
+  };
+
+  const handleUnlink = (entityId: string, entityType: EntityType) => {
+    const key = getLinkedIdsKey(entityType);
+    setLinkedIds((prev) => ({
+      ...prev,
+      [key]: (prev[key] || []).filter((i) => i !== entityId),
+    }));
+  };
+
+  const handleOpenLink = (entityId: string, entityType: EntityType) => {
+    const pathMap: Record<EntityType, string> = {
+      problem: "problems",
+      hypothesis: "hypotheses",
+      experiment: "experiments",
+      decision: "decisions",
+      artifact: "artifacts",
+      quick_capture: "quick-captures",
+    };
+    navigate(`/product/${productId}/${pathMap[entityType]}/${entityId}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <Skeleton className="mb-4 h-8 w-24" />
+        <Skeleton className="mb-4 h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!entity || entity.type !== "artifact") {
+    return <div className="p-8">Artifact not found</div>;
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-border px-8 py-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/product/${productId}/artifacts`)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Artifacts
+        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            Updated {formatDistanceToNow(new Date(entity.updatedAt), { addSuffix: true })}
+          </span>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete artifact?</AlertDialogTitle>
+                <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="mx-auto max-w-3xl space-y-6">
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Artifact title..."
+            className="border-none bg-transparent text-2xl font-bold shadow-none focus-visible:ring-0"
+          />
+
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Type</Label>
+              <Select value={artifactType} onValueChange={(v) => setArtifactType(v as ArtifactType)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ARTIFACT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Badge variant="outline">Artifact</Badge>
+          </div>
+
+          {(artifactType === "link" || artifactType === "image") && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                {artifactType === "link" ? "URL" : "Image URL"}
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder={artifactType === "link" ? "https://..." : "https://...image.png"}
+                  className="flex-1"
+                />
+                {source && artifactType === "link" && (
+                  <Button variant="outline" size="icon" asChild>
+                    <a href={source} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+              {source && artifactType === "image" && (
+                <div className="mt-2 overflow-hidden rounded-lg border border-border">
+                  <img src={source} alt={title} className="max-h-64 w-full object-contain" />
+                </div>
+              )}
+            </div>
+          )}
+
+          <Collapsible open={tagsOpen} onOpenChange={setTagsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="mb-2 gap-2">
+                Context Tags
+                <Badge variant="secondary" className="ml-1">
+                  {personaIds.length + featureAreaIds.length + Object.values(dimensionValues).flat().length}
+                </Badge>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <ContextTagsPicker
+                  productId={productId!}
+                  personaIds={personaIds}
+                  featureAreaIds={featureAreaIds}
+                  dimensionValueIdsByDimension={dimensionValues}
+                  onPersonasChange={setPersonaIds}
+                  onFeatureAreasChange={setFeatureAreaIds}
+                  onDimensionValuesChange={(dimId, valueIds) =>
+                    setDimensionValues((prev) => ({ ...prev, [dimId]: valueIds }))
+                  }
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <RichTextEditor
+            content={body}
+            onChange={setBody}
+            placeholder="Add notes about this artifact..."
+          />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">Linked Items</h3>
+              <Button variant="outline" size="sm" onClick={() => setLinkModalOpen(true)}>
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Link to...
+              </Button>
+            </div>
+            <LinkedItems
+              productId={productId!}
+              linkedIds={linkedIds}
+              onUnlink={handleUnlink}
+              onOpenLink={handleOpenLink}
+            />
+          </div>
+        </div>
+      </div>
+
+      <LinkToModal
+        open={linkModalOpen}
+        onOpenChange={setLinkModalOpen}
+        productId={productId!}
+        currentEntityId={id!}
+        linkedIds={linkedIds}
+        onLink={handleLink}
+      />
+    </div>
+  );
+}
+
+function getLinkedIdsKey(type: EntityType): keyof LinkedIds {
+  const map: Record<EntityType, keyof LinkedIds> = {
+    problem: "problems",
+    hypothesis: "hypotheses",
+    experiment: "experiments",
+    decision: "decisions",
+    artifact: "artifacts",
+    quick_capture: "quickCaptures",
+  };
+  return map[type];
+}
