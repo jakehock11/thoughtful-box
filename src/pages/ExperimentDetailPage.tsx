@@ -35,7 +35,6 @@ import { RichTextEditor } from "@/components/editor";
 import { ContextTagsPicker } from "@/components/taxonomy";
 import { LinkToModal, LinkedItems } from "@/components/linking";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
 import type { Experiment, ExperimentStatus, ExperimentOutcome, EntityType, LinkedIds } from "@/lib/db";
 
 const STATUS_OPTIONS: { value: ExperimentStatus; label: string }[] = [
@@ -171,52 +170,53 @@ export default function ExperimentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8">
+      <div className="page-container">
         <Skeleton className="mb-4 h-8 w-24" />
-        <Skeleton className="mb-4 h-12 w-full" />
+        <Skeleton className="mb-4 h-10 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   if (!entity || entity.type !== "experiment") {
-    return <div className="p-8">Experiment not found</div>;
+    return <div className="page-container text-sm text-muted-foreground">Experiment not found</div>;
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border px-8 py-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/product/${productId}/experiments`)}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Experiments
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-6 py-3">
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/product/${productId}/experiments`)} className="gap-2 text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="text-sm">Experiments</span>
         </Button>
         <div className="flex items-center gap-2">
           {saveStatus === "saving" && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               Saving...
             </span>
           )}
           {saveStatus === "saved" && (
-            <span className="flex items-center gap-1 text-xs text-green-600">
+            <span className="flex items-center gap-1.5 text-xs text-primary">
               <Check className="h-3 w-3" />
               Saved
             </span>
           )}
-          <Button variant="outline" size="sm" onClick={() => handleSave(true)} disabled={saveStatus === "saving"}>
-            <Save className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={() => handleSave(true)} disabled={saveStatus === "saving"} className="gap-2">
+            <Save className="h-3.5 w-3.5" />
             Save
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Trash2 className="h-4 w-4 text-destructive" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete experiment?</AlertDialogTitle>
-                <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                <AlertDialogDescription className="text-sm">This action cannot be undone.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -227,20 +227,23 @@ export default function ExperimentDetailPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="mx-auto max-w-3xl space-y-6">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
+        <div className="content-max-width space-y-5">
+          {/* Title */}
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Experiment title..."
-            className="border-none bg-transparent text-2xl font-bold shadow-none focus-visible:ring-0"
+            className="border-none bg-transparent text-xl font-semibold tracking-tight shadow-none focus-visible:ring-0 px-0 h-auto py-1"
           />
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="space-y-1">
+          {/* Status & Outcome */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as ExperimentStatus)}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-28 h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -254,10 +257,10 @@ export default function ExperimentDetailPage() {
             </div>
 
             {status === "complete" && (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Outcome</Label>
                 <Select value={outcome || ""} onValueChange={(v) => setOutcome(v as ExperimentOutcome)}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-28 h-8 text-sm">
                     <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -271,20 +274,21 @@ export default function ExperimentDetailPage() {
               </div>
             )}
 
-            <Badge variant="outline">Experiment</Badge>
+            <Badge variant="outline" className="text-xs font-medium">Experiment</Badge>
           </div>
 
+          {/* Context Tags */}
           <Collapsible open={tagsOpen} onOpenChange={setTagsOpen}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="mb-2 gap-2">
+              <Button variant="ghost" size="sm" className="mb-2 gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Context Tags
-                <Badge variant="secondary" className="ml-1">
+                <Badge variant="secondary" className="ml-1 text-[11px]">
                   {personaIds.length + featureAreaIds.length + Object.values(dimensionValues).flat().length}
                 </Badge>
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <div className="rounded-lg border border-border bg-accent/30 p-4">
                 <ContextTagsPicker
                   productId={productId!}
                   personaIds={personaIds}
@@ -300,17 +304,19 @@ export default function ExperimentDetailPage() {
             </CollapsibleContent>
           </Collapsible>
 
+          {/* Body Editor */}
           <RichTextEditor
             content={body}
             onChange={setBody}
             placeholder="Describe the experiment setup, metrics, and results..."
           />
 
+          {/* Linked Items */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Linked Items</h3>
-              <Button variant="outline" size="sm" onClick={() => setLinkModalOpen(true)}>
-                <LinkIcon className="mr-2 h-4 w-4" />
+              <h3 className="text-sm font-medium text-foreground">Linked Items</h3>
+              <Button variant="outline" size="sm" onClick={() => setLinkModalOpen(true)} className="gap-2">
+                <LinkIcon className="h-3.5 w-3.5" />
                 Link to...
               </Button>
             </div>
