@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Trash2, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Trash2, Link as LinkIcon, Save, Check, Loader2 } from "lucide-react";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useEntity, useUpdateEntity, useDeleteEntity } from "@/hooks/useEntities";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,9 @@ export default function ExperimentDetailPage() {
   const [linkedIds, setLinkedIds] = useState<LinkedIds>({});
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const savedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (productId) setCurrentProduct(productId);
@@ -92,6 +95,7 @@ export default function ExperimentDetailPage() {
 
   const handleSave = useCallback(async () => {
     if (!entity || entity.type !== "experiment") return;
+    setSaveStatus("saving");
     try {
       await updateEntity.mutateAsync({
         ...entity,
@@ -104,15 +108,22 @@ export default function ExperimentDetailPage() {
         dimensionValueIdsByDimension: dimensionValues,
         linkedIds,
       } as Experiment);
+      setSaveStatus("saved");
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+      savedTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
+      setSaveStatus("idle");
       toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
     }
   }, [entity, title, body, status, outcome, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast]);
 
   useEffect(() => {
     if (!entity) return;
-    const timeout = setTimeout(handleSave, 1000);
-    return () => clearTimeout(timeout);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(handleSave, 1000);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, [title, body, status, outcome, personaIds, featureAreaIds, dimensionValues, linkedIds]);
 
   const handleDelete = async () => {
@@ -176,9 +187,22 @@ export default function ExperimentDetailPage() {
           Experiments
         </Button>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            Updated {formatDistanceToNow(new Date(entity.updatedAt), { addSuffix: true })}
-          </span>
+          {saveStatus === "saving" && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving...
+            </span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="flex items-center gap-1 text-xs text-green-600">
+              <Check className="h-3 w-3" />
+              Saved
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleSave} disabled={saveStatus === "saving"}>
+            <Save className="mr-2 h-4 w-4" />
+            Save
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="icon">
