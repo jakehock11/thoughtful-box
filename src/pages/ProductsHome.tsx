@@ -40,18 +40,18 @@ export default function ProductsHome() {
   }
 
   return (
-    <div className="flex min-h-full flex-col p-8">
+    <div className="page-container flex min-h-full flex-col">
       {hasProducts ? (
         <>
           {/* Header */}
-          <div className="mb-8 flex items-center justify-between">
+          <div className="page-header page-header-row">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Products</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-page-title">Products</h1>
+              <p className="mt-1 text-meta">
                 Select a product to manage its thinking system
               </p>
             </div>
-            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Button onClick={() => setCreateOpen(true)} size="sm" className="gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
               Create Product
             </Button>
@@ -62,12 +62,12 @@ export default function ProductsHome() {
             {products.map((product) => (
               <Card
                 key={product.id}
-                className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
+                className="cursor-pointer shadow-sm transition-all duration-150 hover:shadow-md hover:border-primary/25"
                 onClick={() => enterProduct(product.id)}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2 pt-4 px-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-semibold uppercase text-muted-foreground">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-xs font-semibold uppercase text-secondary-foreground">
                       {product.icon?.type === "image" && product.icon.data ? (
                         <img
                           src={product.icon.data}
@@ -75,14 +75,14 @@ export default function ProductsHome() {
                           className="h-full w-full rounded-lg object-cover"
                         />
                       ) : (
-                        product.name.slice(0, 2)
+                        <span className="tracking-tight">{product.name.slice(0, 2)}</span>
                       )}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <CardTitle className="truncate text-base">
+                      <CardTitle className="truncate text-sm font-medium">
                         {product.name}
                       </CardTitle>
-                      <CardDescription className="text-xs">
+                      <CardDescription className="text-[11px] mt-0.5">
                         Last activity{" "}
                         {formatDistanceToNow(new Date(product.lastActivityAt), {
                           addSuffix: true,
@@ -91,8 +91,8 @@ export default function ProductsHome() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex gap-4 text-xs text-muted-foreground">
+                <CardContent className="px-4 pb-4">
+                  <div className="flex gap-4 text-[11px] text-muted-foreground">
                     <span>
                       {product.taxonomy.personas.filter((p) => !p.isArchived).length} personas
                     </span>
@@ -108,18 +108,18 @@ export default function ProductsHome() {
       ) : (
         /* Empty State */
         <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
-            <Layers className="h-10 w-10 text-primary" />
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <Layers className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="mb-2 text-2xl font-bold text-foreground">
+          <h1 className="mb-2 text-xl font-semibold text-foreground">
             Create your first product
           </h1>
-          <p className="mb-8 max-w-md text-muted-foreground">
+          <p className="mb-8 max-w-md text-sm text-muted-foreground">
             Product OS helps you capture and connect your product thinking—problems,
             hypotheses, experiments, and decisions—all in one place.
           </p>
-          <Button onClick={() => setCreateOpen(true)} size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
+          <Button onClick={() => setCreateOpen(true)} size="default" className="gap-2 shadow-sm">
+            <Plus className="h-4 w-4" />
             Create Product
           </Button>
         </div>

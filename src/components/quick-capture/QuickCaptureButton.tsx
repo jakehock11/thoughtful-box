@@ -10,10 +10,10 @@ export function QuickCaptureButton() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="w-full justify-start gap-3"
+        className="w-full justify-start gap-2.5 h-8 text-[13px] shadow-sm"
         variant="default"
       >
-        <Zap className="h-4 w-4" />
+        <Zap className="h-3.5 w-3.5" />
         Quick Capture
       </Button>
       <QuickCaptureModal open={open} onOpenChange={setOpen} />

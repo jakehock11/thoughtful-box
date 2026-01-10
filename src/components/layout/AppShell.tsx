@@ -15,7 +15,7 @@ export function AppShell() {
       {currentProductId && <ProductSidebar />}
 
       {/* Column 3: Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-y-auto scrollbar-thin">
         <Outlet />
       </main>
     </div>

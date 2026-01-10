@@ -60,17 +60,19 @@ export default function ProductHome() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">
+    <div className="page-container">
+      {/* Header */}
+      <div className="page-header">
+        <h1 className="text-page-title">
           {currentProduct?.name || "Product"} Home
         </h1>
-        <p className="text-muted-foreground">
+        <p className="mt-1 text-meta">
           Overview of your product thinking
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Dashboard Grid */}
+      <div className="grid gap-5 lg:grid-cols-2">
         {/* Quick Captures */}
         <DashboardCard
           title="Quick Captures"
@@ -163,25 +165,25 @@ function DashboardCard<T>({
   renderItem,
 }: DashboardCardProps<T>) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-2 text-base font-medium">
+    <Card className="shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 px-4">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Icon className="h-4 w-4 text-muted-foreground" />
           {title}
         </CardTitle>
         <Link
           to={viewAllLink}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           View all
           <ChevronRight className="h-3 w-3" />
         </Link>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         {items.length > 0 ? (
-          <div className="space-y-1">{items.map(renderItem)}</div>
+          <div className="space-y-0.5">{items.map(renderItem)}</div>
         ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">
+          <p className="py-6 text-center text-xs text-muted-foreground">
             {emptyMessage}
           </p>
         )}
@@ -201,16 +203,16 @@ function EntityRow({ title, timestamp, status, to }: EntityRowProps) {
   return (
     <Link
       to={to}
-      className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-muted"
+      className="flex items-center justify-between rounded-md px-2 py-1.5 transition-colors duration-100 hover:bg-accent"
     >
-      <span className="truncate text-sm">{title}</span>
+      <span className="truncate text-sm text-foreground">{title}</span>
       <div className="flex items-center gap-2">
         {status && (
-          <Badge variant="secondary" className="text-xs capitalize">
+          <Badge variant="secondary" className="text-[11px] capitalize font-medium">
             {status}
           </Badge>
         )}
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
           {formatDistanceToNow(new Date(timestamp), { addSuffix: true })}
         </span>
       </div>

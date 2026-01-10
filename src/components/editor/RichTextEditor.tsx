@@ -97,7 +97,7 @@ export function RichTextEditor({
   }
 
   return (
-    <div className={cn("rounded-lg border border-border bg-card", className)}>
+    <div className={cn("rounded-lg border border-border bg-card shadow-sm", className)}>
       {editable && <EditorToolbar editor={editor} onSetLink={setLink} />}
       <div className="p-4">
         <EditorContent editor={editor} />

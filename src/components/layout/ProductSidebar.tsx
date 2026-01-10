@@ -30,16 +30,16 @@ function NavItem({ to, icon: Icon, label }: NavItemProps) {
       to={to}
       className={({ isActive }) =>
         cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-all duration-100",
           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           isActive
             ? "bg-sidebar-accent text-sidebar-accent-foreground"
-            : "text-sidebar-foreground"
+            : "text-sidebar-foreground/80 hover:text-sidebar-foreground"
         )
       }
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="truncate">{label}</span>
     </NavLink>
   );
 }
@@ -52,40 +52,44 @@ export function ProductSidebar() {
   const basePath = `/product/${currentProductId}`;
 
   return (
-    <div className="flex h-full w-56 flex-col border-r border-border bg-sidebar">
+    <div className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Product Name Header */}
-      <div className="flex h-14 items-center border-b border-border px-4">
-        <h2 className="truncate text-sm font-semibold text-sidebar-foreground">
+      <div className="flex h-12 items-center border-b border-sidebar-border px-3">
+        <h2 className="truncate text-[13px] font-semibold text-sidebar-foreground tracking-tight">
           {currentProduct?.name || "Loading..."}
         </h2>
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto scrollbar-thin p-2">
         {/* Quick Capture CTA */}
         <QuickCaptureButton />
 
-        <Separator className="my-2" />
+        <Separator className="my-3 bg-sidebar-border" />
 
         <NavItem to={`${basePath}/home`} icon={Home} label="Home" />
 
-        <Separator className="my-2" />
+        <Separator className="my-3 bg-sidebar-border" />
 
-        <NavItem to={`${basePath}/problems`} icon={AlertCircle} label="Problems" />
-        <NavItem to={`${basePath}/hypotheses`} icon={Lightbulb} label="Hypotheses" />
-        <NavItem to={`${basePath}/experiments`} icon={FlaskConical} label="Experiments" />
-        <NavItem to={`${basePath}/decisions`} icon={CheckCircle} label="Decisions" />
-        <NavItem to={`${basePath}/artifacts`} icon={Paperclip} label="Artifacts" />
+        <div className="space-y-0.5">
+          <NavItem to={`${basePath}/problems`} icon={AlertCircle} label="Problems" />
+          <NavItem to={`${basePath}/hypotheses`} icon={Lightbulb} label="Hypotheses" />
+          <NavItem to={`${basePath}/experiments`} icon={FlaskConical} label="Experiments" />
+          <NavItem to={`${basePath}/decisions`} icon={CheckCircle} label="Decisions" />
+          <NavItem to={`${basePath}/artifacts`} icon={Paperclip} label="Artifacts" />
+        </div>
 
-        <Separator className="my-2" />
+        <Separator className="my-3 bg-sidebar-border" />
 
         <NavItem to={`${basePath}/timeline`} icon={Clock} label="Timeline" />
 
-        <Separator className="my-2" />
+        <Separator className="my-3 bg-sidebar-border" />
 
-        <NavItem to={`${basePath}/taxonomy`} icon={Tags} label="Manage Context" />
-        <NavItem to={`${basePath}/exports`} icon={Download} label="Exports" />
-        <NavItem to={`${basePath}/settings`} icon={Settings} label="Settings" />
+        <div className="space-y-0.5">
+          <NavItem to={`${basePath}/taxonomy`} icon={Tags} label="Manage Context" />
+          <NavItem to={`${basePath}/exports`} icon={Download} label="Exports" />
+          <NavItem to={`${basePath}/settings`} icon={Settings} label="Settings" />
+        </div>
       </nav>
     </div>
   );
