@@ -45,7 +45,7 @@ export function ProductRail() {
       <div className="mb-4 h-px w-8 bg-sidebar-border" />
 
       {/* Product List */}
-      <div className="flex flex-1 flex-col items-center gap-2.5 overflow-y-auto scrollbar-thin px-1">
+      <div className="flex flex-1 flex-col items-center gap-2.5 overflow-y-auto scrollbar-thin px-1 py-1">
         {isLoading ? (
           <>
             <Skeleton className="h-9 w-9 rounded-lg" />
