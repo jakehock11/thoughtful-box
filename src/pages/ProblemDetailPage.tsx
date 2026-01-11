@@ -34,8 +34,7 @@ import { RichTextEditor } from "@/components/editor";
 import { ContextTagsPicker } from "@/components/taxonomy";
 import { LinkToModal, LinkedItems } from "@/components/linking";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import type { Problem, ProblemStatus, EntityType, LinkedIds } from "@/lib/db";
+import type { ProblemStatus, EntityType } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: ProblemStatus; label: string }[] = [
   { value: "active", label: "Active" },
@@ -58,9 +57,8 @@ export default function ProblemDetailPage() {
   const [body, setBody] = useState("");
   const [status, setStatus] = useState<ProblemStatus>("active");
   const [personaIds, setPersonaIds] = useState<string[]>([]);
-  const [featureAreaIds, setFeatureAreaIds] = useState<string[]>([]);
-  const [dimensionValues, setDimensionValues] = useState<Record<string, string[]>>({});
-  const [linkedIds, setLinkedIds] = useState<LinkedIds>({});
+  const [featureIds, setFeatureIds] = useState<string[]>([]);
+  const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -73,31 +71,30 @@ export default function ProblemDetailPage() {
 
   useEffect(() => {
     if (entity && entity.type === "problem") {
-      const problem = entity as Problem;
-      setTitle(problem.title);
-      setBody(problem.body);
-      setStatus(problem.status);
-      setPersonaIds(problem.personaIds);
-      setFeatureAreaIds(problem.featureAreaIds);
-      setDimensionValues(problem.dimensionValueIdsByDimension);
-      setLinkedIds(problem.linkedIds || {});
+      setTitle(entity.title);
+      setBody(entity.body);
+      setStatus((entity.status as ProblemStatus) || "active");
+      setPersonaIds(entity.personaIds || []);
+      setFeatureIds(entity.featureIds || []);
+      setDimensionValueIds(entity.dimensionValueIds || []);
     }
   }, [entity]);
 
   const handleSave = useCallback(async (navigateAfter = false) => {
-    if (!entity || entity.type !== "problem") return;
+    if (!entity || entity.type !== "problem" || !id) return;
     setSaveStatus("saving");
     try {
       await updateEntity.mutateAsync({
-        ...entity,
-        title,
-        body,
-        status,
-        personaIds,
-        featureAreaIds,
-        dimensionValueIdsByDimension: dimensionValues,
-        linkedIds,
-      } as Problem);
+        id,
+        data: {
+          title,
+          body,
+          status,
+          personaIds,
+          featureIds,
+          dimensionValueIds,
+        },
+      });
       setSaveStatus("saved");
       if (navigateAfter) {
         navigate(`/product/${productId}/problems`);
@@ -109,7 +106,7 @@ export default function ProblemDetailPage() {
       setSaveStatus("idle");
       toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
     }
-  }, [entity, title, body, status, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast, navigate, productId]);
+  }, [entity, id, title, body, status, personaIds, featureIds, dimensionValueIds, updateEntity, toast, navigate, productId]);
 
   // Auto-save on changes with debounce
   useEffect(() => {
@@ -119,7 +116,7 @@ export default function ProblemDetailPage() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, body, status, personaIds, featureAreaIds, dimensionValues, linkedIds]);
+  }, [title, body, status, personaIds, featureIds, dimensionValueIds]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -132,22 +129,6 @@ export default function ProblemDetailPage() {
     }
   };
 
-  const handleLink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: [...(prev[key] || []), entityId],
-    }));
-  };
-
-  const handleUnlink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: (prev[key] || []).filter((id) => id !== entityId),
-    }));
-  };
-
   const handleOpenLink = (entityId: string, entityType: EntityType) => {
     const pathMap: Record<EntityType, string> = {
       problem: "problems",
@@ -155,7 +136,7 @@ export default function ProblemDetailPage() {
       experiment: "experiments",
       decision: "decisions",
       artifact: "artifacts",
-      quick_capture: "quick-captures",
+      capture: "captures",
     };
     navigate(`/product/${productId}/${pathMap[entityType]}/${entityId}`);
   };
@@ -255,7 +236,7 @@ export default function ProblemDetailPage() {
               <Button variant="ghost" size="sm" className="mb-2 gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Context Tags
                 <Badge variant="secondary" className="ml-1 text-[11px]">
-                  {personaIds.length + featureAreaIds.length + Object.values(dimensionValues).flat().length}
+                  {personaIds.length + featureIds.length + dimensionValueIds.length}
                 </Badge>
               </Button>
             </CollapsibleTrigger>
@@ -264,13 +245,11 @@ export default function ProblemDetailPage() {
                 <ContextTagsPicker
                   productId={productId!}
                   personaIds={personaIds}
-                  featureAreaIds={featureAreaIds}
-                  dimensionValueIdsByDimension={dimensionValues}
+                  featureIds={featureIds}
+                  dimensionValueIds={dimensionValueIds}
                   onPersonasChange={setPersonaIds}
-                  onFeatureAreasChange={setFeatureAreaIds}
-                  onDimensionValuesChange={(dimId, valueIds) =>
-                    setDimensionValues((prev) => ({ ...prev, [dimId]: valueIds }))
-                  }
+                  onFeaturesChange={setFeatureIds}
+                  onDimensionValueIdsChange={setDimensionValueIds}
                 />
               </div>
             </CollapsibleContent>
@@ -293,9 +272,7 @@ export default function ProblemDetailPage() {
               </Button>
             </div>
             <LinkedItems
-              productId={productId!}
-              linkedIds={linkedIds}
-              onUnlink={handleUnlink}
+              entityId={id!}
               onOpenLink={handleOpenLink}
             />
           </div>
@@ -307,21 +284,7 @@ export default function ProblemDetailPage() {
         onOpenChange={setLinkModalOpen}
         productId={productId!}
         currentEntityId={id!}
-        linkedIds={linkedIds}
-        onLink={handleLink}
       />
     </div>
   );
-}
-
-function getLinkedIdsKey(type: EntityType): keyof LinkedIds {
-  const map: Record<EntityType, keyof LinkedIds> = {
-    problem: "problems",
-    hypothesis: "hypotheses",
-    experiment: "experiments",
-    decision: "decisions",
-    artifact: "artifacts",
-    quick_capture: "quickCaptures",
-  };
-  return map[type];
 }

@@ -1,26 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
-import { useProductContext } from "@/contexts/ProductContext";
-import { useEntitiesByType, useCreateEntity } from "@/hooks/useEntities";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import type { Decision } from "@/lib/db";
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Plus, Search } from 'lucide-react';
+import { useProductContext } from '@/contexts/ProductContext';
+import { useEntitiesByType, useCreateEntity } from '@/hooks/useEntities';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { formatDistanceToNow } from 'date-fns';
+import type { Entity, DecisionType } from '@/lib/types';
 
 export default function DecisionsPage() {
   const { productId } = useParams<{ productId: string }>();
   const { setCurrentProduct } = useProductContext();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const { data: decisions, isLoading } = useEntitiesByType(productId, "decision");
+
+  const { data: decisions, isLoading } = useEntitiesByType(productId, 'decision');
   const createEntity = useCreateEntity();
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (productId) setCurrentProduct(productId);
@@ -28,7 +28,7 @@ export default function DecisionsPage() {
 
   const filteredDecisions = useMemo(() => {
     if (!decisions) return [];
-    return (decisions as Decision[])
+    return decisions
       .filter((d) => {
         if (search && !d.title.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
@@ -40,13 +40,17 @@ export default function DecisionsPage() {
     if (!productId) return;
     try {
       const entity = await createEntity.mutateAsync({
-        type: "decision",
+        type: 'decision',
         productId,
-        title: "Untitled Decision",
+        title: 'Untitled Decision',
       });
       navigate(`/product/${productId}/decisions/${entity.id}`);
     } catch {
-      toast({ title: "Error", description: "Failed to create decision", variant: "destructive" });
+      toast({
+        title: 'Error',
+        description: 'Failed to create decision',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -69,9 +73,7 @@ export default function DecisionsPage() {
       <div className="page-header page-header-row">
         <div>
           <h1 className="text-page-title">Decisions</h1>
-          <p className="mt-1 text-meta">
-            Document what was decided and why
-          </p>
+          <p className="mt-1 text-meta">Document what was decided and why</p>
         </div>
         <Button onClick={handleCreate} size="sm" className="gap-2 shadow-sm">
           <Plus className="h-4 w-4" />
@@ -96,9 +98,7 @@ export default function DecisionsPage() {
       {filteredDecisions.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <p className="mb-4 text-sm text-muted-foreground">
-            {search
-              ? "No decisions match your search."
-              : "No decisions recorded yet."}
+            {search ? 'No decisions match your search.' : 'No decisions recorded yet.'}
           </p>
           {!search && (
             <Button onClick={handleCreate} variant="outline" size="sm">
@@ -108,27 +108,32 @@ export default function DecisionsPage() {
         </div>
       ) : (
         <div className="space-y-1.5">
-          {filteredDecisions.map((decision) => (
-            <Link
-              key={decision.id}
-              to={`/product/${productId}/decisions/${decision.id}`}
-              className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 transition-all duration-150 hover:bg-accent hover:shadow-sm"
-            >
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-medium text-foreground">{decision.title}</h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {decision.decidedAt
-                    ? `Decided ${formatDistanceToNow(new Date(decision.decidedAt), { addSuffix: true })}`
-                    : `Created ${formatDistanceToNow(new Date(decision.createdAt), { addSuffix: true })}`}
-                </p>
-              </div>
-              {decision.decisionType && (
-                <Badge variant="secondary" className="ml-4 capitalize text-xs font-medium">
-                  {decision.decisionType}
-                </Badge>
-              )}
-            </Link>
-          ))}
+          {filteredDecisions.map((decision) => {
+            const decidedAt = decision.metadata?.decidedAt as string | undefined;
+            const decisionType = decision.metadata?.decisionType as DecisionType | undefined;
+
+            return (
+              <Link
+                key={decision.id}
+                to={`/product/${productId}/decisions/${decision.id}`}
+                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 transition-all duration-150 hover:bg-accent hover:shadow-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-medium text-foreground">{decision.title}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {decidedAt
+                      ? `Decided ${formatDistanceToNow(new Date(decidedAt), { addSuffix: true })}`
+                      : `Created ${formatDistanceToNow(new Date(decision.createdAt), { addSuffix: true })}`}
+                  </p>
+                </div>
+                {decisionType && (
+                  <Badge variant="secondary" className="ml-4 capitalize text-xs font-medium">
+                    {decisionType}
+                  </Badge>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

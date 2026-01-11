@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, X, AlertCircle, Lightbulb, FlaskConical, CheckCircle, Paperclip, Zap } from "lucide-react";
+import { Search, AlertCircle, Lightbulb, FlaskConical, CheckCircle, Paperclip, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,21 +7,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEntities } from "@/hooks/useEntities";
+import { useRelationships, useCreateRelationship } from "@/hooks/useRelationships";
 import { formatDistanceToNow } from "date-fns";
-import type { Entity, EntityType, LinkedIds } from "@/lib/db";
+import type { Entity, EntityType, RelationshipWithEntity } from "@/lib/types";
 
-const TYPE_CONFIG: Record<EntityType, { icon: React.ElementType; label: string; pluralKey: keyof LinkedIds }> = {
-  problem: { icon: AlertCircle, label: "Problem", pluralKey: "problems" },
-  hypothesis: { icon: Lightbulb, label: "Hypothesis", pluralKey: "hypotheses" },
-  experiment: { icon: FlaskConical, label: "Experiment", pluralKey: "experiments" },
-  decision: { icon: CheckCircle, label: "Decision", pluralKey: "decisions" },
-  artifact: { icon: Paperclip, label: "Artifact", pluralKey: "artifacts" },
-  quick_capture: { icon: Zap, label: "Capture", pluralKey: "quickCaptures" },
+const TYPE_CONFIG: Record<EntityType, { icon: React.ElementType; label: string }> = {
+  problem: { icon: AlertCircle, label: "Problem" },
+  hypothesis: { icon: Lightbulb, label: "Hypothesis" },
+  experiment: { icon: FlaskConical, label: "Experiment" },
+  decision: { icon: CheckCircle, label: "Decision" },
+  artifact: { icon: Paperclip, label: "Artifact" },
+  capture: { icon: Zap, label: "Capture" },
 };
 
 interface LinkToModalProps {
@@ -29,8 +29,7 @@ interface LinkToModalProps {
   onOpenChange: (open: boolean) => void;
   productId: string;
   currentEntityId: string;
-  linkedIds: LinkedIds;
-  onLink: (entityId: string, entityType: EntityType) => void;
+  onLinked?: () => void;
 }
 
 export function LinkToModal({
@@ -38,21 +37,19 @@ export function LinkToModal({
   onOpenChange,
   productId,
   currentEntityId,
-  linkedIds,
-  onLink,
+  onLinked,
 }: LinkToModalProps) {
   const [search, setSearch] = useState("");
   const [typeFilters, setTypeFilters] = useState<EntityType[]>([]);
   const { data: entities } = useEntities(productId);
+  const { data: relationships } = useRelationships(currentEntityId);
+  const createRelationship = useCreateRelationship();
 
   // Get all currently linked entity IDs
-  const allLinkedIds = useMemo(() => {
-    const ids = new Set<string>();
-    Object.values(linkedIds).forEach((arr) => {
-      arr?.forEach((id) => ids.add(id));
-    });
-    return ids;
-  }, [linkedIds]);
+  const linkedEntityIds = useMemo(() => {
+    if (!relationships) return new Set<string>();
+    return new Set(relationships.map((r) => r.linkedEntity.id));
+  }, [relationships]);
 
   // Filter and sort entities
   const filteredEntities = useMemo(() => {
@@ -62,7 +59,7 @@ export function LinkToModal({
         // Exclude current entity
         if (e.id === currentEntityId) return false;
         // Exclude already linked
-        if (allLinkedIds.has(e.id)) return false;
+        if (linkedEntityIds.has(e.id)) return false;
         // Type filter
         if (typeFilters.length > 0 && !typeFilters.includes(e.type)) return false;
         // Search filter
@@ -75,7 +72,7 @@ export function LinkToModal({
         return true;
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [entities, currentEntityId, allLinkedIds, typeFilters, search]);
+  }, [entities, currentEntityId, linkedEntityIds, typeFilters, search]);
 
   // Recent items (last 10 when no search)
   const recentItems = useMemo(() => {
@@ -85,10 +82,19 @@ export function LinkToModal({
 
   const displayItems = search || typeFilters.length > 0 ? filteredEntities : recentItems;
 
-  const handleLink = (entity: Entity) => {
-    onLink(entity.id, entity.type);
-    setSearch("");
-    onOpenChange(false);
+  const handleLink = async (entity: Entity) => {
+    try {
+      await createRelationship.mutateAsync({
+        sourceId: currentEntityId,
+        targetId: entity.id,
+        productId,
+      });
+      setSearch("");
+      onLinked?.();
+      onOpenChange(false);
+    } catch {
+      // Error handled by mutation
+    }
   };
 
   return (
@@ -151,7 +157,8 @@ export function LinkToModal({
                     <button
                       key={entity.id}
                       onClick={() => handleLink(entity)}
-                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted"
+                      disabled={createRelationship.isPending}
+                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted disabled:opacity-50"
                     >
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-muted">
                         <Icon className="h-4 w-4 text-muted-foreground" />
@@ -174,28 +181,20 @@ export function LinkToModal({
   );
 }
 
-// Component to display linked items as pills
+// Component to display linked items using relationships
 interface LinkedItemsProps {
-  productId: string;
-  linkedIds: LinkedIds;
-  onUnlink: (entityId: string, entityType: EntityType) => void;
+  entityId: string;
   onOpenLink: (entityId: string, entityType: EntityType) => void;
 }
 
-export function LinkedItems({ productId, linkedIds, onUnlink, onOpenLink }: LinkedItemsProps) {
-  const { data: entities } = useEntities(productId);
+export function LinkedItems({ entityId, onOpenLink }: LinkedItemsProps) {
+  const { data: relationships, isLoading } = useRelationships(entityId);
 
-  // Get all linked entities
-  const linkedEntities = useMemo(() => {
-    if (!entities) return [];
-    const allLinkedIds = new Set<string>();
-    Object.values(linkedIds).forEach((arr) => {
-      arr?.forEach((id) => allLinkedIds.add(id));
-    });
-    return entities.filter((e) => allLinkedIds.has(e.id));
-  }, [entities, linkedIds]);
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading...</p>;
+  }
 
-  if (linkedEntities.length === 0) {
+  if (!relationships || relationships.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">No linked items yet.</p>
     );
@@ -203,44 +202,30 @@ export function LinkedItems({ productId, linkedIds, onUnlink, onOpenLink }: Link
 
   return (
     <div className="flex flex-wrap gap-2">
-      {linkedEntities.map((entity) => {
+      {relationships.map((rel) => {
+        const entity = rel.linkedEntity;
         const config = TYPE_CONFIG[entity.type];
         const Icon = config.icon;
-        const status = getEntityStatus(entity);
 
         return (
-          <div
-            key={entity.id}
+          <button
+            key={rel.id}
+            onClick={() => onOpenLink(entity.id, entity.type)}
             className="group flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted"
           >
-            <button
-              onClick={() => onOpenLink(entity.id, entity.type)}
-              className="flex items-center gap-2"
-            >
-              <Icon className="h-4 w-4 text-muted-foreground" />
-              <span className="max-w-[150px] truncate">{entity.title}</span>
-              {status && (
-                <Badge variant="secondary" className="text-xs capitalize">
-                  {status}
-                </Badge>
-              )}
-            </button>
-            <button
-              onClick={() => onUnlink(entity.id, entity.type)}
-              className="ml-1 opacity-0 transition-opacity group-hover:opacity-100"
-              aria-label="Unlink"
-            >
-              <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-            </button>
-          </div>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            <span className="max-w-[150px] truncate">{entity.title}</span>
+            {entity.status && (
+              <Badge variant="secondary" className="text-xs capitalize">
+                {entity.status}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-xs">
+              {rel.direction === 'incoming' ? '←' : '→'}
+            </Badge>
+          </button>
         );
       })}
     </div>
   );
-}
-
-function getEntityStatus(entity: Entity): string | undefined {
-  if (entity.type === "problem") return (entity as any).status;
-  if (entity.type === "experiment") return (entity as any).status;
-  return undefined;
 }

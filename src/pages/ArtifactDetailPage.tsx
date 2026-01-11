@@ -35,7 +35,9 @@ import { RichTextEditor } from "@/components/editor";
 import { ContextTagsPicker } from "@/components/taxonomy";
 import { LinkToModal, LinkedItems } from "@/components/linking";
 import { useToast } from "@/hooks/use-toast";
-import type { Artifact, ArtifactType, EntityType, LinkedIds } from "@/lib/db";
+import type { ArtifactStatus, EntityType } from "@/lib/types";
+
+type ArtifactType = "note" | "link" | "image" | "file" | "query";
 
 const ARTIFACT_TYPE_OPTIONS: { value: ArtifactType; label: string }[] = [
   { value: "note", label: "Note" },
@@ -43,6 +45,12 @@ const ARTIFACT_TYPE_OPTIONS: { value: ArtifactType; label: string }[] = [
   { value: "image", label: "Image" },
   { value: "file", label: "File" },
   { value: "query", label: "Query" },
+];
+
+const STATUS_OPTIONS: { value: ArtifactStatus; label: string }[] = [
+  { value: "draft", label: "Draft" },
+  { value: "final", label: "Final" },
+  { value: "archived", label: "Archived" },
 ];
 
 export default function ArtifactDetailPage() {
@@ -56,12 +64,12 @@ export default function ArtifactDetailPage() {
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [status, setStatus] = useState<ArtifactStatus>("draft");
   const [artifactType, setArtifactType] = useState<ArtifactType>("note");
   const [source, setSource] = useState("");
   const [personaIds, setPersonaIds] = useState<string[]>([]);
-  const [featureAreaIds, setFeatureAreaIds] = useState<string[]>([]);
-  const [dimensionValues, setDimensionValues] = useState<Record<string, string[]>>({});
-  const [linkedIds, setLinkedIds] = useState<LinkedIds>({});
+  const [featureIds, setFeatureIds] = useState<string[]>([]);
+  const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -74,33 +82,37 @@ export default function ArtifactDetailPage() {
 
   useEffect(() => {
     if (entity && entity.type === "artifact") {
-      const artifact = entity as Artifact;
-      setTitle(artifact.title);
-      setBody(artifact.body);
-      setArtifactType(artifact.artifactType);
-      setSource(artifact.source || "");
-      setPersonaIds(artifact.personaIds);
-      setFeatureAreaIds(artifact.featureAreaIds);
-      setDimensionValues(artifact.dimensionValueIdsByDimension);
-      setLinkedIds(artifact.linkedIds || {});
+      setTitle(entity.title);
+      setBody(entity.body);
+      setStatus((entity.status as ArtifactStatus) || "draft");
+      setArtifactType((entity.metadata?.artifactType as ArtifactType) || "note");
+      setSource(entity.metadata?.source || "");
+      setPersonaIds(entity.personaIds || []);
+      setFeatureIds(entity.featureIds || []);
+      setDimensionValueIds(entity.dimensionValueIds || []);
     }
   }, [entity]);
 
   const handleSave = useCallback(async (navigateAfter = false) => {
-    if (!entity || entity.type !== "artifact") return;
+    if (!entity || entity.type !== "artifact" || !id) return;
     setSaveStatus("saving");
     try {
       await updateEntity.mutateAsync({
-        ...entity,
-        title,
-        body,
-        artifactType,
-        source: source || undefined,
-        personaIds,
-        featureAreaIds,
-        dimensionValueIdsByDimension: dimensionValues,
-        linkedIds,
-      } as Artifact);
+        id,
+        data: {
+          title,
+          body,
+          status,
+          personaIds,
+          featureIds,
+          dimensionValueIds,
+          metadata: {
+            ...entity.metadata,
+            artifactType,
+            source: source || undefined,
+          },
+        },
+      });
       setSaveStatus("saved");
       if (navigateAfter) {
         navigate(`/product/${productId}/artifacts`);
@@ -112,7 +124,7 @@ export default function ArtifactDetailPage() {
       setSaveStatus("idle");
       toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
     }
-  }, [entity, title, body, artifactType, source, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast, navigate, productId]);
+  }, [entity, id, title, body, status, artifactType, source, personaIds, featureIds, dimensionValueIds, updateEntity, toast, navigate, productId]);
 
   useEffect(() => {
     if (!entity) return;
@@ -121,7 +133,7 @@ export default function ArtifactDetailPage() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, body, artifactType, source, personaIds, featureAreaIds, dimensionValues, linkedIds]);
+  }, [title, body, status, artifactType, source, personaIds, featureIds, dimensionValueIds]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -134,22 +146,6 @@ export default function ArtifactDetailPage() {
     }
   };
 
-  const handleLink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: [...(prev[key] || []), entityId],
-    }));
-  };
-
-  const handleUnlink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: (prev[key] || []).filter((i) => i !== entityId),
-    }));
-  };
-
   const handleOpenLink = (entityId: string, entityType: EntityType) => {
     const pathMap: Record<EntityType, string> = {
       problem: "problems",
@@ -157,7 +153,7 @@ export default function ArtifactDetailPage() {
       experiment: "experiments",
       decision: "decisions",
       artifact: "artifacts",
-      quick_capture: "quick-captures",
+      capture: "captures",
     };
     navigate(`/product/${productId}/${pathMap[entityType]}/${entityId}`);
   };
@@ -232,7 +228,7 @@ export default function ArtifactDetailPage() {
             className="border-none bg-transparent text-xl font-semibold tracking-tight shadow-none focus-visible:ring-0 px-0 h-auto py-1"
           />
 
-          {/* Type */}
+          {/* Type & Status */}
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Type</Label>
@@ -242,6 +238,22 @@ export default function ArtifactDetailPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {ARTIFACT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as ArtifactStatus)}>
+                <SelectTrigger className="w-24 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -288,7 +300,7 @@ export default function ArtifactDetailPage() {
               <Button variant="ghost" size="sm" className="mb-2 gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Context Tags
                 <Badge variant="secondary" className="ml-1 text-[11px]">
-                  {personaIds.length + featureAreaIds.length + Object.values(dimensionValues).flat().length}
+                  {personaIds.length + featureIds.length + dimensionValueIds.length}
                 </Badge>
               </Button>
             </CollapsibleTrigger>
@@ -297,13 +309,11 @@ export default function ArtifactDetailPage() {
                 <ContextTagsPicker
                   productId={productId!}
                   personaIds={personaIds}
-                  featureAreaIds={featureAreaIds}
-                  dimensionValueIdsByDimension={dimensionValues}
+                  featureIds={featureIds}
+                  dimensionValueIds={dimensionValueIds}
                   onPersonasChange={setPersonaIds}
-                  onFeatureAreasChange={setFeatureAreaIds}
-                  onDimensionValuesChange={(dimId, valueIds) =>
-                    setDimensionValues((prev) => ({ ...prev, [dimId]: valueIds }))
-                  }
+                  onFeaturesChange={setFeatureIds}
+                  onDimensionValueIdsChange={setDimensionValueIds}
                 />
               </div>
             </CollapsibleContent>
@@ -326,9 +336,7 @@ export default function ArtifactDetailPage() {
               </Button>
             </div>
             <LinkedItems
-              productId={productId!}
-              linkedIds={linkedIds}
-              onUnlink={handleUnlink}
+              entityId={id!}
               onOpenLink={handleOpenLink}
             />
           </div>
@@ -340,21 +348,7 @@ export default function ArtifactDetailPage() {
         onOpenChange={setLinkModalOpen}
         productId={productId!}
         currentEntityId={id!}
-        linkedIds={linkedIds}
-        onLink={handleLink}
       />
     </div>
   );
-}
-
-function getLinkedIdsKey(type: EntityType): keyof LinkedIds {
-  const map: Record<EntityType, keyof LinkedIds> = {
-    problem: "problems",
-    hypothesis: "hypotheses",
-    experiment: "experiments",
-    decision: "decisions",
-    artifact: "artifacts",
-    quick_capture: "quickCaptures",
-  };
-  return map[type];
 }

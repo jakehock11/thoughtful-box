@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +36,14 @@ import { RichTextEditor } from "@/components/editor";
 import { ContextTagsPicker } from "@/components/taxonomy";
 import { LinkToModal, LinkedItems } from "@/components/linking";
 import { useToast } from "@/hooks/use-toast";
-import type { Hypothesis, EntityType, LinkedIds } from "@/lib/db";
+import type { HypothesisStatus, EntityType } from "@/lib/types";
+
+const STATUS_OPTIONS: { value: HypothesisStatus; label: string }[] = [
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "invalidated", label: "Invalidated" },
+  { value: "archived", label: "Archived" },
+];
 
 export default function HypothesisDetailPage() {
   const { productId, id } = useParams<{ productId: string; id: string }>();
@@ -40,10 +56,11 @@ export default function HypothesisDetailPage() {
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [status, setStatus] = useState<HypothesisStatus>("draft");
+  const [confidence, setConfidence] = useState<number>(50);
   const [personaIds, setPersonaIds] = useState<string[]>([]);
-  const [featureAreaIds, setFeatureAreaIds] = useState<string[]>([]);
-  const [dimensionValues, setDimensionValues] = useState<Record<string, string[]>>({});
-  const [linkedIds, setLinkedIds] = useState<LinkedIds>({});
+  const [featureIds, setFeatureIds] = useState<string[]>([]);
+  const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -56,29 +73,35 @@ export default function HypothesisDetailPage() {
 
   useEffect(() => {
     if (entity && entity.type === "hypothesis") {
-      const hypothesis = entity as Hypothesis;
-      setTitle(hypothesis.title);
-      setBody(hypothesis.body);
-      setPersonaIds(hypothesis.personaIds);
-      setFeatureAreaIds(hypothesis.featureAreaIds);
-      setDimensionValues(hypothesis.dimensionValueIdsByDimension);
-      setLinkedIds(hypothesis.linkedIds || {});
+      setTitle(entity.title);
+      setBody(entity.body);
+      setStatus((entity.status as HypothesisStatus) || "draft");
+      setConfidence(entity.metadata?.confidence ?? 50);
+      setPersonaIds(entity.personaIds || []);
+      setFeatureIds(entity.featureIds || []);
+      setDimensionValueIds(entity.dimensionValueIds || []);
     }
   }, [entity]);
 
   const handleSave = useCallback(async (navigateAfter = false) => {
-    if (!entity || entity.type !== "hypothesis") return;
+    if (!entity || entity.type !== "hypothesis" || !id) return;
     setSaveStatus("saving");
     try {
       await updateEntity.mutateAsync({
-        ...entity,
-        title,
-        body,
-        personaIds,
-        featureAreaIds,
-        dimensionValueIdsByDimension: dimensionValues,
-        linkedIds,
-      } as Hypothesis);
+        id,
+        data: {
+          title,
+          body,
+          status,
+          personaIds,
+          featureIds,
+          dimensionValueIds,
+          metadata: {
+            ...entity.metadata,
+            confidence,
+          },
+        },
+      });
       setSaveStatus("saved");
       if (navigateAfter) {
         navigate(`/product/${productId}/hypotheses`);
@@ -90,7 +113,7 @@ export default function HypothesisDetailPage() {
       setSaveStatus("idle");
       toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
     }
-  }, [entity, title, body, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast, navigate, productId]);
+  }, [entity, id, title, body, status, confidence, personaIds, featureIds, dimensionValueIds, updateEntity, toast, navigate, productId]);
 
   useEffect(() => {
     if (!entity) return;
@@ -99,7 +122,7 @@ export default function HypothesisDetailPage() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, body, personaIds, featureAreaIds, dimensionValues, linkedIds]);
+  }, [title, body, status, confidence, personaIds, featureIds, dimensionValueIds]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -112,22 +135,6 @@ export default function HypothesisDetailPage() {
     }
   };
 
-  const handleLink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: [...(prev[key] || []), entityId],
-    }));
-  };
-
-  const handleUnlink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: (prev[key] || []).filter((i) => i !== entityId),
-    }));
-  };
-
   const handleOpenLink = (entityId: string, entityType: EntityType) => {
     const pathMap: Record<EntityType, string> = {
       problem: "problems",
@@ -135,7 +142,7 @@ export default function HypothesisDetailPage() {
       experiment: "experiments",
       decision: "decisions",
       artifact: "artifacts",
-      quick_capture: "quick-captures",
+      capture: "captures",
     };
     navigate(`/product/${productId}/${pathMap[entityType]}/${entityId}`);
   };
@@ -210,8 +217,38 @@ export default function HypothesisDetailPage() {
             className="border-none bg-transparent text-xl font-semibold tracking-tight shadow-none focus-visible:ring-0 px-0 h-auto py-1"
           />
 
-          {/* Badge */}
-          <Badge variant="outline" className="text-xs font-medium">Hypothesis</Badge>
+          {/* Status & Confidence */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as HypothesisStatus)}>
+                <SelectTrigger className="w-32 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5 w-40">
+              <Label className="text-xs text-muted-foreground">Confidence: {confidence}%</Label>
+              <Slider
+                value={[confidence]}
+                onValueChange={([v]) => setConfidence(v)}
+                min={0}
+                max={100}
+                step={5}
+                className="h-8"
+              />
+            </div>
+
+            <Badge variant="outline" className="text-xs font-medium">Hypothesis</Badge>
+          </div>
 
           {/* Context Tags */}
           <Collapsible open={tagsOpen} onOpenChange={setTagsOpen}>
@@ -219,7 +256,7 @@ export default function HypothesisDetailPage() {
               <Button variant="ghost" size="sm" className="mb-2 gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Context Tags
                 <Badge variant="secondary" className="ml-1 text-[11px]">
-                  {personaIds.length + featureAreaIds.length + Object.values(dimensionValues).flat().length}
+                  {personaIds.length + featureIds.length + dimensionValueIds.length}
                 </Badge>
               </Button>
             </CollapsibleTrigger>
@@ -228,13 +265,11 @@ export default function HypothesisDetailPage() {
                 <ContextTagsPicker
                   productId={productId!}
                   personaIds={personaIds}
-                  featureAreaIds={featureAreaIds}
-                  dimensionValueIdsByDimension={dimensionValues}
+                  featureIds={featureIds}
+                  dimensionValueIds={dimensionValueIds}
                   onPersonasChange={setPersonaIds}
-                  onFeatureAreasChange={setFeatureAreaIds}
-                  onDimensionValuesChange={(dimId, valueIds) =>
-                    setDimensionValues((prev) => ({ ...prev, [dimId]: valueIds }))
-                  }
+                  onFeaturesChange={setFeatureIds}
+                  onDimensionValueIdsChange={setDimensionValueIds}
                 />
               </div>
             </CollapsibleContent>
@@ -257,9 +292,7 @@ export default function HypothesisDetailPage() {
               </Button>
             </div>
             <LinkedItems
-              productId={productId!}
-              linkedIds={linkedIds}
-              onUnlink={handleUnlink}
+              entityId={id!}
               onOpenLink={handleOpenLink}
             />
           </div>
@@ -271,21 +304,7 @@ export default function HypothesisDetailPage() {
         onOpenChange={setLinkModalOpen}
         productId={productId!}
         currentEntityId={id!}
-        linkedIds={linkedIds}
-        onLink={handleLink}
       />
     </div>
   );
-}
-
-function getLinkedIdsKey(type: EntityType): keyof LinkedIds {
-  const map: Record<EntityType, keyof LinkedIds> = {
-    problem: "problems",
-    hypothesis: "hypotheses",
-    experiment: "experiments",
-    decision: "decisions",
-    artifact: "artifacts",
-    quick_capture: "quickCaptures",
-  };
-  return map[type];
 }

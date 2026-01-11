@@ -1,137 +1,124 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  getEntitiesByProduct,
-  getEntitiesByProductAndType,
-  getEntity,
-  saveEntity,
-  deleteEntity,
-  generateId,
-  type Entity,
-  type EntityType,
-  type Problem,
-  type Hypothesis,
-  type Experiment,
-  type Decision,
-  type Artifact,
-  type QuickCapture,
-} from "@/lib/db";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useMemo } from 'react';
+import { api } from '@/lib/ipc';
+import type {
+  Entity,
+  EntityType,
+  CreateEntityData,
+  UpdateEntityData,
+  EntityFilters,
+} from '@/lib/types';
 
-const ENTITIES_KEY = ["entities"];
+const ENTITIES_KEY = ['entities'];
 
-export function useEntities(productId: string | undefined) {
+// Get all entities for a product with optional filters
+export function useEntities(productId: string | undefined, filters?: EntityFilters) {
   return useQuery({
-    queryKey: [...ENTITIES_KEY, productId],
-    queryFn: () => (productId ? getEntitiesByProduct(productId) : []),
+    queryKey: [...ENTITIES_KEY, productId, filters],
+    queryFn: () => (productId ? api.entities.getAll(productId, filters) : []),
     enabled: !!productId,
   });
 }
 
+// Get entities by type
 export function useEntitiesByType(productId: string | undefined, type: EntityType) {
-  return useQuery({
-    queryKey: [...ENTITIES_KEY, productId, type],
-    queryFn: () => (productId ? getEntitiesByProductAndType(productId, type) : []),
-    enabled: !!productId,
-  });
+  return useEntities(productId, { type });
 }
 
+// Get a single entity by ID
 export function useEntity(id: string | undefined) {
   return useQuery({
-    queryKey: [...ENTITIES_KEY, "single", id],
-    queryFn: () => (id ? getEntity(id) : undefined),
+    queryKey: [...ENTITIES_KEY, 'single', id],
+    queryFn: () => (id ? api.entities.getById(id) : null),
     enabled: !!id,
   });
 }
 
-type CreateEntityInput = 
-  | { type: "problem"; productId: string; title: string; body?: string; status?: Problem["status"] }
-  | { type: "hypothesis"; productId: string; title: string; body?: string }
-  | { type: "experiment"; productId: string; title: string; body?: string; status?: Experiment["status"] }
-  | { type: "decision"; productId: string; title: string; body?: string }
-  | { type: "artifact"; productId: string; title: string; body?: string; artifactType?: Artifact["artifactType"] }
-  | { type: "quick_capture"; productId: string; title: string; body?: string };
-
+// Create entity mutation
 export function useCreateEntity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CreateEntityInput) => {
-      const now = new Date().toISOString();
-
-      const baseEntity = {
-        id: generateId(),
-        productId: input.productId,
-        title: input.title,
-        body: input.body || "",
-        createdAt: now,
-        updatedAt: now,
-        personaIds: [],
-        featureAreaIds: [],
-        dimensionValueIdsByDimension: {},
-        linkedIds: {},
-      };
-
-      let entity: Entity;
-
-      switch (input.type) {
-        case "problem":
-          entity = { ...baseEntity, type: "problem", status: input.status || "active" } as Problem;
-          break;
-        case "hypothesis":
-          entity = { ...baseEntity, type: "hypothesis" } as Hypothesis;
-          break;
-        case "experiment":
-          entity = { ...baseEntity, type: "experiment", status: input.status || "planned" } as Experiment;
-          break;
-        case "decision":
-          entity = { ...baseEntity, type: "decision" } as Decision;
-          break;
-        case "artifact":
-          entity = { ...baseEntity, type: "artifact", artifactType: input.artifactType || "note" } as Artifact;
-          break;
-        case "quick_capture":
-          entity = { ...baseEntity, type: "quick_capture" } as QuickCapture;
-          break;
-      }
-
-      await saveEntity(entity);
-      return entity;
-    },
+    mutationFn: (data: CreateEntityData) => api.entities.create(data),
     onSuccess: (entity) => {
       queryClient.invalidateQueries({ queryKey: ENTITIES_KEY });
     },
   });
 }
 
+// Update entity mutation
 export function useUpdateEntity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (entity: Entity) => {
-      const updated = {
-        ...entity,
-        updatedAt: new Date().toISOString(),
-      };
-      await saveEntity(updated);
-      return updated;
-    },
-    onSuccess: () => {
+    mutationFn: ({ id, data }: { id: string; data: UpdateEntityData }) =>
+      api.entities.update(id, data),
+    onSuccess: (entity) => {
       queryClient.invalidateQueries({ queryKey: ENTITIES_KEY });
+      queryClient.invalidateQueries({ queryKey: [...ENTITIES_KEY, 'single', entity.id] });
     },
   });
 }
 
+// Delete entity mutation
 export function useDeleteEntity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: deleteEntity,
+    mutationFn: (id: string) => api.entities.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ENTITIES_KEY });
     },
   });
 }
 
-// Helper to get entities by type with proper typing
+// Promote capture to another entity type
+export function usePromoteCapture() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ captureId, targetType }: { captureId: string; targetType: EntityType }) =>
+      api.entities.promote(captureId, targetType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ENTITIES_KEY });
+    },
+  });
+}
+
+// Hook with built-in filter state management
+export function useEntitiesWithFilters(productId: string | undefined) {
+  const [filters, setFilters] = useState<EntityFilters>({});
+
+  const query = useEntities(productId, filters);
+
+  const setTypeFilter = useCallback((type: EntityType | undefined) => {
+    setFilters((prev) => ({ ...prev, type }));
+  }, []);
+
+  const setStatusFilter = useCallback((status: string | undefined) => {
+    setFilters((prev) => ({ ...prev, status }));
+  }, []);
+
+  const setSearchFilter = useCallback((search: string | undefined) => {
+    setFilters((prev) => ({ ...prev, search }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters({});
+  }, []);
+
+  return {
+    ...query,
+    filters,
+    setFilters,
+    setTypeFilter,
+    setStatusFilter,
+    setSearchFilter,
+    clearFilters,
+  };
+}
+
+// Filter helper for client-side filtering
 export function filterEntitiesByType<T extends Entity>(
   entities: Entity[] | undefined,
   type: EntityType
@@ -139,3 +126,26 @@ export function filterEntitiesByType<T extends Entity>(
   if (!entities) return [];
   return entities.filter((e) => e.type === type) as T[];
 }
+
+// Group entities by type
+export function useEntitiesGroupedByType(productId: string | undefined) {
+  const { data: entities, ...rest } = useEntities(productId);
+
+  const grouped = useMemo(() => {
+    if (!entities) return null;
+
+    return {
+      captures: entities.filter((e) => e.type === 'capture'),
+      problems: entities.filter((e) => e.type === 'problem'),
+      hypotheses: entities.filter((e) => e.type === 'hypothesis'),
+      experiments: entities.filter((e) => e.type === 'experiment'),
+      decisions: entities.filter((e) => e.type === 'decision'),
+      artifacts: entities.filter((e) => e.type === 'artifact'),
+    };
+  }, [entities]);
+
+  return { data: grouped, entities, ...rest };
+}
+
+// Re-export types for convenience
+export type { Entity, EntityType, CreateEntityData, UpdateEntityData, EntityFilters };

@@ -35,20 +35,20 @@ import { RichTextEditor } from "@/components/editor";
 import { ContextTagsPicker } from "@/components/taxonomy";
 import { LinkToModal, LinkedItems } from "@/components/linking";
 import { useToast } from "@/hooks/use-toast";
-import type { Experiment, ExperimentStatus, ExperimentOutcome, EntityType, LinkedIds } from "@/lib/db";
+import type { ExperimentStatus, ExperimentOutcome, EntityType } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: ExperimentStatus; label: string }[] = [
   { value: "planned", label: "Planned" },
   { value: "running", label: "Running" },
   { value: "paused", label: "Paused" },
   { value: "complete", label: "Complete" },
+  { value: "archived", label: "Archived" },
 ];
 
 const OUTCOME_OPTIONS: { value: ExperimentOutcome; label: string }[] = [
-  { value: "win", label: "Win" },
-  { value: "partial", label: "Partial" },
+  { value: "validated", label: "Validated" },
+  { value: "invalidated", label: "Invalidated" },
   { value: "inconclusive", label: "Inconclusive" },
-  { value: "fail", label: "Fail" },
 ];
 
 export default function ExperimentDetailPage() {
@@ -65,9 +65,8 @@ export default function ExperimentDetailPage() {
   const [status, setStatus] = useState<ExperimentStatus>("planned");
   const [outcome, setOutcome] = useState<ExperimentOutcome | undefined>();
   const [personaIds, setPersonaIds] = useState<string[]>([]);
-  const [featureAreaIds, setFeatureAreaIds] = useState<string[]>([]);
-  const [dimensionValues, setDimensionValues] = useState<Record<string, string[]>>({});
-  const [linkedIds, setLinkedIds] = useState<LinkedIds>({});
+  const [featureIds, setFeatureIds] = useState<string[]>([]);
+  const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -80,33 +79,35 @@ export default function ExperimentDetailPage() {
 
   useEffect(() => {
     if (entity && entity.type === "experiment") {
-      const experiment = entity as Experiment;
-      setTitle(experiment.title);
-      setBody(experiment.body);
-      setStatus(experiment.status);
-      setOutcome(experiment.outcome);
-      setPersonaIds(experiment.personaIds);
-      setFeatureAreaIds(experiment.featureAreaIds);
-      setDimensionValues(experiment.dimensionValueIdsByDimension);
-      setLinkedIds(experiment.linkedIds || {});
+      setTitle(entity.title);
+      setBody(entity.body);
+      setStatus((entity.status as ExperimentStatus) || "planned");
+      setOutcome(entity.metadata?.outcome as ExperimentOutcome | undefined);
+      setPersonaIds(entity.personaIds || []);
+      setFeatureIds(entity.featureIds || []);
+      setDimensionValueIds(entity.dimensionValueIds || []);
     }
   }, [entity]);
 
   const handleSave = useCallback(async (navigateAfter = false) => {
-    if (!entity || entity.type !== "experiment") return;
+    if (!entity || entity.type !== "experiment" || !id) return;
     setSaveStatus("saving");
     try {
       await updateEntity.mutateAsync({
-        ...entity,
-        title,
-        body,
-        status,
-        outcome,
-        personaIds,
-        featureAreaIds,
-        dimensionValueIdsByDimension: dimensionValues,
-        linkedIds,
-      } as Experiment);
+        id,
+        data: {
+          title,
+          body,
+          status,
+          personaIds,
+          featureIds,
+          dimensionValueIds,
+          metadata: {
+            ...entity.metadata,
+            outcome,
+          },
+        },
+      });
       setSaveStatus("saved");
       if (navigateAfter) {
         navigate(`/product/${productId}/experiments`);
@@ -118,7 +119,7 @@ export default function ExperimentDetailPage() {
       setSaveStatus("idle");
       toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
     }
-  }, [entity, title, body, status, outcome, personaIds, featureAreaIds, dimensionValues, linkedIds, updateEntity, toast, navigate, productId]);
+  }, [entity, id, title, body, status, outcome, personaIds, featureIds, dimensionValueIds, updateEntity, toast, navigate, productId]);
 
   useEffect(() => {
     if (!entity) return;
@@ -127,7 +128,7 @@ export default function ExperimentDetailPage() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, body, status, outcome, personaIds, featureAreaIds, dimensionValues, linkedIds]);
+  }, [title, body, status, outcome, personaIds, featureIds, dimensionValueIds]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -140,22 +141,6 @@ export default function ExperimentDetailPage() {
     }
   };
 
-  const handleLink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: [...(prev[key] || []), entityId],
-    }));
-  };
-
-  const handleUnlink = (entityId: string, entityType: EntityType) => {
-    const key = getLinkedIdsKey(entityType);
-    setLinkedIds((prev) => ({
-      ...prev,
-      [key]: (prev[key] || []).filter((i) => i !== entityId),
-    }));
-  };
-
   const handleOpenLink = (entityId: string, entityType: EntityType) => {
     const pathMap: Record<EntityType, string> = {
       problem: "problems",
@@ -163,7 +148,7 @@ export default function ExperimentDetailPage() {
       experiment: "experiments",
       decision: "decisions",
       artifact: "artifacts",
-      quick_capture: "quick-captures",
+      capture: "captures",
     };
     navigate(`/product/${productId}/${pathMap[entityType]}/${entityId}`);
   };
@@ -260,7 +245,7 @@ export default function ExperimentDetailPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Outcome</Label>
                 <Select value={outcome || ""} onValueChange={(v) => setOutcome(v as ExperimentOutcome)}>
-                  <SelectTrigger className="w-28 h-8 text-sm">
+                  <SelectTrigger className="w-32 h-8 text-sm">
                     <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -283,7 +268,7 @@ export default function ExperimentDetailPage() {
               <Button variant="ghost" size="sm" className="mb-2 gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                 Context Tags
                 <Badge variant="secondary" className="ml-1 text-[11px]">
-                  {personaIds.length + featureAreaIds.length + Object.values(dimensionValues).flat().length}
+                  {personaIds.length + featureIds.length + dimensionValueIds.length}
                 </Badge>
               </Button>
             </CollapsibleTrigger>
@@ -292,13 +277,11 @@ export default function ExperimentDetailPage() {
                 <ContextTagsPicker
                   productId={productId!}
                   personaIds={personaIds}
-                  featureAreaIds={featureAreaIds}
-                  dimensionValueIdsByDimension={dimensionValues}
+                  featureIds={featureIds}
+                  dimensionValueIds={dimensionValueIds}
                   onPersonasChange={setPersonaIds}
-                  onFeatureAreasChange={setFeatureAreaIds}
-                  onDimensionValuesChange={(dimId, valueIds) =>
-                    setDimensionValues((prev) => ({ ...prev, [dimId]: valueIds }))
-                  }
+                  onFeaturesChange={setFeatureIds}
+                  onDimensionValueIdsChange={setDimensionValueIds}
                 />
               </div>
             </CollapsibleContent>
@@ -321,9 +304,7 @@ export default function ExperimentDetailPage() {
               </Button>
             </div>
             <LinkedItems
-              productId={productId!}
-              linkedIds={linkedIds}
-              onUnlink={handleUnlink}
+              entityId={id!}
               onOpenLink={handleOpenLink}
             />
           </div>
@@ -335,21 +316,7 @@ export default function ExperimentDetailPage() {
         onOpenChange={setLinkModalOpen}
         productId={productId!}
         currentEntityId={id!}
-        linkedIds={linkedIds}
-        onLink={handleLink}
       />
     </div>
   );
-}
-
-function getLinkedIdsKey(type: EntityType): keyof LinkedIds {
-  const map: Record<EntityType, keyof LinkedIds> = {
-    problem: "problems",
-    hypothesis: "hypotheses",
-    experiment: "experiments",
-    decision: "decisions",
-    artifact: "artifacts",
-    quick_capture: "quickCaptures",
-  };
-  return map[type];
 }

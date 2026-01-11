@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProductProvider } from "@/contexts/ProductContext";
+import { QuickCaptureProvider } from "@/contexts/QuickCaptureContext";
 import { AppShell } from "@/components/layout";
 
 import ProductsHome from "./pages/ProductsHome";
@@ -24,6 +25,7 @@ import TaxonomyPage from "./pages/TaxonomyPage";
 import ExportsPage from "./pages/ExportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import QuickCaptureDetailPage from "./pages/QuickCaptureDetailPage";
+import CapturesPage from "./pages/CapturesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,7 +38,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <ProductProvider>
-            <Routes>
+            <QuickCaptureProvider>
+              <Routes>
               <Route element={<AppShell />}>
                 <Route path="/" element={<Navigate to="/products" replace />} />
                 <Route path="/products" element={<ProductsHome />} />
@@ -55,10 +58,12 @@ const App = () => (
                 <Route path="/product/:productId/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/product/:productId/exports" element={<ExportsPage />} />
                 <Route path="/product/:productId/settings" element={<SettingsPage />} />
-                <Route path="/product/:productId/quick-captures/:id" element={<QuickCaptureDetailPage />} />
+                <Route path="/product/:productId/captures/:id" element={<QuickCaptureDetailPage />} />
+                <Route path="/product/:productId/captures" element={<CapturesPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
-            </Routes>
+              </Routes>
+            </QuickCaptureProvider>
           </ProductProvider>
         </BrowserRouter>
       </TooltipProvider>

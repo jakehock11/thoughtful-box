@@ -1,12 +1,12 @@
-import { useNavigate } from "react-router-dom";
-import { Plus, Layers } from "lucide-react";
-import { useProducts } from "@/hooks/useProducts";
-import { useProductContext } from "@/contexts/ProductContext";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ThemeToggle } from "@/components/theme";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useNavigate } from 'react-router-dom';
+import { Plus, Layers } from 'lucide-react';
+import { useProducts } from '@/hooks/useProducts';
+import { useProductContext } from '@/contexts/ProductContext';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ThemeToggle } from '@/components/theme';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function ProductRail() {
   const navigate = useNavigate();
@@ -15,11 +15,16 @@ export function ProductRail() {
 
   const handleAppIconClick = () => {
     exitProduct();
-    navigate("/products");
+    navigate('/products');
   };
 
   const handleCreateProduct = () => {
-    navigate("/products", { state: { openCreate: true } });
+    navigate('/products', { state: { openCreate: true } });
+  };
+
+  // Get initials from product name (first 2 characters)
+  const getInitials = (name: string): string => {
+    return name.slice(0, 2).toUpperCase();
   };
 
   return (
@@ -30,15 +35,17 @@ export function ProductRail() {
           <button
             onClick={handleAppIconClick}
             className={cn(
-              "mb-4 flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150",
-              "bg-primary text-primary-foreground shadow-sm hover:shadow-md hover:scale-[1.02]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              'mb-4 flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150',
+              'bg-primary text-primary-foreground shadow-sm hover:shadow-md hover:scale-[1.02]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar'
             )}
           >
             <Layers className="h-4.5 w-4.5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>Products Home</TooltipContent>
+        <TooltipContent side="right" sideOffset={8}>
+          Products Home
+        </TooltipContent>
       </Tooltip>
 
       {/* Divider */}
@@ -58,28 +65,28 @@ export function ProductRail() {
                 <button
                   onClick={() => enterProduct(product.id)}
                   className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold transition-all duration-150",
-                    "hover:bg-sidebar-accent hover:scale-[1.02]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
+                    'flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold transition-all duration-150',
+                    'hover:bg-sidebar-accent hover:scale-[1.02]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar',
                     currentProductId === product.id
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground ring-2 ring-primary/30"
-                      : "bg-secondary text-muted-foreground"
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground ring-2 ring-primary/30'
+                      : 'bg-secondary text-muted-foreground'
                   )}
                 >
-                  {product.icon?.type === "image" && product.icon.data ? (
+                  {product.icon ? (
                     <img
-                      src={product.icon.data}
+                      src={product.icon}
                       alt={product.name}
                       className="h-full w-full rounded-lg object-cover"
                     />
                   ) : (
-                    <span className="uppercase tracking-tight">
-                      {product.name.slice(0, 2)}
-                    </span>
+                    <span className="uppercase tracking-tight">{getInitials(product.name)}</span>
                   )}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8}>{product.name}</TooltipContent>
+              <TooltipContent side="right" sideOffset={8}>
+                {product.name}
+              </TooltipContent>
             </Tooltip>
           ))
         )}
@@ -98,7 +105,9 @@ export function ProductRail() {
               <Plus className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>Create Product</TooltipContent>
+          <TooltipContent side="right" sideOffset={8}>
+            Create Product
+          </TooltipContent>
         </Tooltip>
 
         {/* Theme Toggle */}

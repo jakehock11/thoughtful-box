@@ -1,24 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
-import { useProductContext } from "@/contexts/ProductContext";
-import { useEntitiesByType, useCreateEntity } from "@/hooks/useEntities";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import type { Problem, ProblemStatus } from "@/lib/db";
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Plus, Search } from 'lucide-react';
+import { useProductContext } from '@/contexts/ProductContext';
+import { useEntitiesByType, useCreateEntity } from '@/hooks/useEntities';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { formatDistanceToNow } from 'date-fns';
+import type { Entity, ProblemStatus } from '@/lib/types';
 
-const STATUS_TABS: { value: ProblemStatus | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "active", label: "Active" },
-  { value: "exploring", label: "Exploring" },
-  { value: "blocked", label: "Blocked" },
-  { value: "solved", label: "Solved" },
-  { value: "archived", label: "Archived" },
+const STATUS_TABS: { value: ProblemStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'exploring', label: 'Exploring' },
+  { value: 'blocked', label: 'Blocked' },
+  { value: 'solved', label: 'Solved' },
+  { value: 'archived', label: 'Archived' },
 ];
 
 export default function ProblemsPage() {
@@ -26,12 +26,12 @@ export default function ProblemsPage() {
   const { setCurrentProduct } = useProductContext();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const { data: problems, isLoading } = useEntitiesByType(productId, "problem");
+
+  const { data: problems, isLoading } = useEntitiesByType(productId, 'problem');
   const createEntity = useCreateEntity();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ProblemStatus | "all">("all");
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ProblemStatus | 'all'>('all');
 
   useEffect(() => {
     if (productId) setCurrentProduct(productId);
@@ -39,9 +39,9 @@ export default function ProblemsPage() {
 
   const filteredProblems = useMemo(() => {
     if (!problems) return [];
-    return (problems as Problem[])
+    return problems
       .filter((p) => {
-        if (statusFilter !== "all" && p.status !== statusFilter) return false;
+        if (statusFilter !== 'all' && p.status !== statusFilter) return false;
         if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
@@ -52,13 +52,14 @@ export default function ProblemsPage() {
     if (!productId) return;
     try {
       const entity = await createEntity.mutateAsync({
-        type: "problem",
+        type: 'problem',
         productId,
-        title: "Untitled Problem",
+        title: 'Untitled Problem',
+        status: 'active',
       });
       navigate(`/product/${productId}/problems/${entity.id}`);
     } catch {
-      toast({ title: "Error", description: "Failed to create problem", variant: "destructive" });
+      toast({ title: 'Error', description: 'Failed to create problem', variant: 'destructive' });
     }
   };
 
@@ -82,9 +83,7 @@ export default function ProblemsPage() {
       <div className="page-header page-header-row">
         <div>
           <h1 className="text-page-title">Problems</h1>
-          <p className="mt-1 text-meta">
-            Track and explore problems worth solving
-          </p>
+          <p className="mt-1 text-meta">Track and explore problems worth solving</p>
         </div>
         <Button onClick={handleCreate} size="sm" className="gap-2 shadow-sm">
           <Plus className="h-4 w-4" />
@@ -103,7 +102,10 @@ export default function ProblemsPage() {
             className="pl-9 h-9"
           />
         </div>
-        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProblemStatus | "all")}>
+        <Tabs
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as ProblemStatus | 'all')}
+        >
           <TabsList className="h-9">
             {STATUS_TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} className="text-xs px-2.5">
@@ -118,11 +120,11 @@ export default function ProblemsPage() {
       {filteredProblems.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <p className="mb-4 text-sm text-muted-foreground">
-            {search || statusFilter !== "all"
-              ? "No problems match your filters."
-              : "No problems yet. Create one to get started."}
+            {search || statusFilter !== 'all'
+              ? 'No problems match your filters.'
+              : 'No problems yet. Create one to get started.'}
           </p>
-          {!search && statusFilter === "all" && (
+          {!search && statusFilter === 'all' && (
             <Button onClick={handleCreate} variant="outline" size="sm">
               Create your first problem
             </Button>
@@ -142,9 +144,11 @@ export default function ProblemsPage() {
                   Updated {formatDistanceToNow(new Date(problem.updatedAt), { addSuffix: true })}
                 </p>
               </div>
-              <Badge variant="secondary" className="ml-4 capitalize text-xs font-medium">
-                {problem.status}
-              </Badge>
+              {problem.status && (
+                <Badge variant="secondary" className="ml-4 capitalize text-xs font-medium">
+                  {problem.status}
+                </Badge>
+              )}
             </Link>
           ))}
         </div>
