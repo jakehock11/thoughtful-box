@@ -32,7 +32,7 @@ export function CreateProductModal({ open, onOpenChange }: CreateProductModalPro
 
     try {
       const product = await createProduct.mutateAsync({ name: name.trim() });
-      
+
       toast({
         title: "Product created",
         description: `${product.name} is ready to use.`,

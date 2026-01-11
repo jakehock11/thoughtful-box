@@ -39,6 +39,9 @@ export function initializeDatabase(dbPath?: string): Database.Database {
 
   if (!tablesExist) {
     runSchema(db);
+  } else {
+    // Run migrations for existing databases
+    migrateSettingsTable(db);
   }
 
   return db;
@@ -57,6 +60,56 @@ function runSchema(database: Database.Database): void {
 
   // Execute the schema (better-sqlite3 handles multi-statement SQL)
   database.exec(schema);
+}
+
+// Migrate settings table for existing databases (Phase 6 migration)
+function migrateSettingsTable(database: Database.Database): void {
+  // Check if settings table exists
+  const settingsExists = database.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='settings'"
+  ).get();
+
+  if (!settingsExists) {
+    // Settings table doesn't exist - create it with full schema
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        workspace_path TEXT,
+        last_product_id TEXT REFERENCES products(id) ON DELETE SET NULL,
+        restore_last_context INTEGER DEFAULT 1,
+        default_export_mode TEXT DEFAULT 'incremental',
+        default_incremental_range TEXT DEFAULT 'since_last_export',
+        include_linked_context INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    return;
+  }
+
+  // Check which columns exist
+  const columns = database.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  const columnNames = new Set(columns.map(c => c.name));
+
+  // Define columns to add if missing (Phase 6 additions)
+  const newColumns = [
+    { name: 'last_product_id', sql: 'ALTER TABLE settings ADD COLUMN last_product_id TEXT REFERENCES products(id) ON DELETE SET NULL' },
+    { name: 'restore_last_context', sql: 'ALTER TABLE settings ADD COLUMN restore_last_context INTEGER DEFAULT 1' },
+    { name: 'default_export_mode', sql: "ALTER TABLE settings ADD COLUMN default_export_mode TEXT DEFAULT 'incremental'" },
+    { name: 'default_incremental_range', sql: "ALTER TABLE settings ADD COLUMN default_incremental_range TEXT DEFAULT 'since_last_export'" },
+    { name: 'include_linked_context', sql: 'ALTER TABLE settings ADD COLUMN include_linked_context INTEGER DEFAULT 1' },
+  ];
+
+  for (const col of newColumns) {
+    if (!columnNames.has(col.name)) {
+      try {
+        database.exec(col.sql);
+      } catch (e) {
+        // Column might already exist or other error - log and continue
+        console.error(`Migration: Failed to add column ${col.name}:`, e);
+      }
+    }
+  }
 }
 
 // Get the database instance

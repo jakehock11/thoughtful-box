@@ -46,8 +46,15 @@ export default defineConfig(({ mode }) => ({
         vite: {
           build: {
             outDir: "dist-electron",
+            lib: {
+              entry: "electron/preload.ts",
+              formats: ["cjs"],
+            },
             rollupOptions: {
               external: ["better-sqlite3"],
+              output: {
+                entryFileNames: "preload.js",
+              },
             },
           },
         },
