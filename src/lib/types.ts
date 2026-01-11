@@ -199,11 +199,38 @@ export interface CreateRelationshipData {
 export type ExportMode = 'full' | 'incremental';
 export type ExportScopeType = 'product' | 'all';
 
+export interface ExportOptions {
+  productId: string | 'all';
+  mode: ExportMode;
+  startDate?: string;
+  includeLinkedContext: boolean;
+}
+
+export interface EntitySummary {
+  id: string;
+  type: EntityType;
+  title: string;
+  status: string | null;
+  updatedAt: string;
+}
+
 export interface ExportCounts {
   total: number;
   byType: Record<EntityType, number>;
-  newCount: number;
-  updatedCount: number;
+  newCount?: number;
+  updatedCount?: number;
+}
+
+export interface ExportPreview {
+  counts: ExportCounts;
+  entities: EntitySummary[];
+}
+
+export interface ExportResult {
+  id: string;
+  outputPath: string;
+  counts: ExportCounts;
+  createdAt: string;
 }
 
 export interface ExportRecord {
@@ -216,25 +243,6 @@ export interface ExportRecord {
   counts: ExportCounts;
   outputPath: string | null;
   createdAt: string;
-}
-
-export interface ExportOptions {
-  mode: ExportMode;
-  scopeType: ExportScopeType;
-  productId?: string;
-  startDate?: string;
-  endDate?: string;
-  includeLinkedContext?: boolean;
-}
-
-export interface ExportPreview {
-  entities: Entity[];
-  counts: ExportCounts;
-}
-
-export interface ExportResult {
-  record: ExportRecord;
-  outputPath: string;
 }
 
 // ============================================

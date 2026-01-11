@@ -166,6 +166,53 @@ interface RelationshipWithEntity extends Relationship {
   direction: 'outgoing' | 'incoming';
 }
 
+// Export types
+interface ExportOptions {
+  productId: string | 'all';
+  mode: 'full' | 'incremental';
+  startDate?: string;
+  includeLinkedContext: boolean;
+}
+
+interface EntitySummary {
+  id: string;
+  type: EntityType;
+  title: string;
+  status: string | null;
+  updatedAt: string;
+}
+
+interface ExportCounts {
+  total: number;
+  byType: Record<EntityType, number>;
+  newCount?: number;
+  updatedCount?: number;
+}
+
+interface ExportPreview {
+  counts: ExportCounts;
+  entities: EntitySummary[];
+}
+
+interface ExportResult {
+  id: string;
+  outputPath: string;
+  counts: ExportCounts;
+  createdAt: string;
+}
+
+interface ExportRecord {
+  id: string;
+  productId: string | null;
+  mode: 'full' | 'incremental';
+  scopeType: 'product' | 'all';
+  startDate: string | null;
+  endDate: string;
+  counts: ExportCounts;
+  outputPath: string | null;
+  createdAt: string;
+}
+
 interface CreateRelationshipData {
   sourceId: string;
   targetId: string;
@@ -283,8 +330,23 @@ const api = {
       ipcRenderer.invoke('relationships:delete', id, sourceEntityId) as Promise<IPCResult>,
   },
 
+  // Exports namespace
+  exports: {
+    getPreview: (options: ExportOptions) =>
+      ipcRenderer.invoke('exports:getPreview', options) as Promise<IPCResult<ExportPreview>>,
+    execute: (options: ExportOptions) =>
+      ipcRenderer.invoke('exports:execute', options) as Promise<IPCResult<ExportResult>>,
+    getHistory: (productId?: string) =>
+      ipcRenderer.invoke('exports:getHistory', productId) as Promise<IPCResult<ExportRecord[]>>,
+    clearHistory: (productId?: string) =>
+      ipcRenderer.invoke('exports:clearHistory', productId) as Promise<IPCResult>,
+    openFolder: (folderPath: string) =>
+      ipcRenderer.invoke('exports:openFolder', folderPath) as Promise<IPCResult>,
+    copySnapshot: (productId: string) =>
+      ipcRenderer.invoke('exports:copySnapshot', productId) as Promise<IPCResult<string>>,
+  },
+
   // Placeholders for future namespaces (will be implemented in later phases)
-  // exports: { ... },
   // settings: { ... },
 };
 

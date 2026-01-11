@@ -1,17 +1,16 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { Download, FileText, Clock, Calendar } from "lucide-react";
+import { Download, FileText, Clock, FolderOpen, Trash2, Copy, ClipboardCheck } from "lucide-react";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useProduct } from "@/hooks/useProducts";
-import { useEntities } from "@/hooks/useEntities";
-import { 
-  getExportsByProduct, 
-  saveExport, 
-  generateId,
-  type ExportRecord,
-  type Entity,
-  type EntityType 
-} from "@/lib/db";
+import {
+  useExportHistory,
+  useExportPreview,
+  useExecuteExport,
+  useClearExportHistory,
+  useOpenExportFolder,
+  useCopySnapshot,
+} from "@/hooks/useExports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,28 +20,59 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ExportOptions, ExportMode, EntityType } from "@/lib/types";
+
+const TYPE_LABELS: Record<EntityType, string> = {
+  capture: "Captures",
+  problem: "Problems",
+  hypothesis: "Hypotheses",
+  experiment: "Experiments",
+  decision: "Decisions",
+  artifact: "Artifacts",
+};
 
 export default function ExportsPage() {
   const { productId } = useParams<{ productId: string }>();
   const { setCurrentProduct } = useProductContext();
   const { data: product } = useProduct(productId);
-  const { data: entities } = useEntities(productId);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const [mode, setMode] = useState<"full" | "incremental">("full");
-  const [includeParents, setIncludeParents] = useState(true);
+  const [mode, setMode] = useState<ExportMode>("full");
+  const [includeLinkedContext, setIncludeLinkedContext] = useState(true);
   const [sinceDate, setSinceDate] = useState("");
-  const [isExporting, setIsExporting] = useState(false);
+  const [showClearDialog, setShowClearDialog] = useState(false);
 
-  const { data: exportHistory, isLoading: historyLoading } = useQuery({
-    queryKey: ["exports", productId],
-    queryFn: () => getExportsByProduct(productId!),
-    enabled: !!productId,
-  });
+  // Hooks
+  const { data: exportHistory, isLoading: historyLoading } = useExportHistory(productId);
+  const executeExport = useExecuteExport();
+  const clearHistory = useClearExportHistory();
+  const openFolder = useOpenExportFolder();
+  const copySnapshot = useCopySnapshot();
+
+  // Build export options for preview
+  const exportOptions: ExportOptions | null = useMemo(() => {
+    if (!productId) return null;
+    return {
+      productId,
+      mode,
+      startDate: mode === "incremental" ? sinceDate || undefined : undefined,
+      includeLinkedContext,
+    };
+  }, [productId, mode, sinceDate, includeLinkedContext]);
+
+  const { data: preview, isLoading: previewLoading } = useExportPreview(exportOptions);
 
   useEffect(() => {
     if (productId) setCurrentProduct(productId);
@@ -52,98 +82,72 @@ export default function ExportsPage() {
   const lastExportDate = useMemo(() => {
     if (!exportHistory || exportHistory.length === 0) return null;
     const sorted = [...exportHistory].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-    return sorted[0].timestamp;
+    return sorted[0].endDate;
   }, [exportHistory]);
 
   const handleExport = async () => {
-    if (!productId || !entities || !product) return;
+    if (!productId || !exportOptions) return;
 
-    setIsExporting(true);
     try {
-      let filteredEntities = [...entities];
-      let startDate: string | undefined;
-
-      if (mode === "incremental") {
-        startDate = sinceDate || lastExportDate || undefined;
-        if (startDate) {
-          const startTime = new Date(startDate).getTime();
-          filteredEntities = entities.filter((e) => {
-            const created = new Date(e.createdAt).getTime();
-            const updated = new Date(e.updatedAt).getTime();
-            return created >= startTime || updated >= startTime;
-          });
-
-          // Include parent context if enabled
-          if (includeParents) {
-            const parentIds = new Set<string>();
-            filteredEntities.forEach((e) => {
-              // For experiments, include linked hypotheses and problems
-              if (e.type === "experiment") {
-                e.linkedIds?.hypotheses?.forEach((id) => parentIds.add(id));
-                e.linkedIds?.problems?.forEach((id) => parentIds.add(id));
-              }
-              // For hypotheses, include linked problems
-              if (e.type === "hypothesis") {
-                e.linkedIds?.problems?.forEach((id) => parentIds.add(id));
-              }
-            });
-
-            // Add parents that aren't already in the export
-            const existingIds = new Set(filteredEntities.map((e) => e.id));
-            entities.forEach((e) => {
-              if (parentIds.has(e.id) && !existingIds.has(e.id)) {
-                filteredEntities.push(e);
-              }
-            });
-          }
-        }
-      }
-
-      // Generate export bundle
-      const bundle = generateExportBundle(product.name, filteredEntities, product.taxonomy);
-
-      // Download as zip-like structure (JSON manifest + markdown files)
-      downloadBundle(bundle, product.name);
-
-      // Record export
-      const counts: Record<EntityType, number> = {
-        problem: 0,
-        hypothesis: 0,
-        experiment: 0,
-        decision: 0,
-        artifact: 0,
-        quick_capture: 0,
-      };
-      filteredEntities.forEach((e) => {
-        counts[e.type]++;
-      });
-
-      const record: ExportRecord = {
-        id: generateId(),
-        productId,
-        timestamp: new Date().toISOString(),
-        mode,
-        startDate,
-        counts,
-      };
-
-      await saveExport(record);
-      queryClient.invalidateQueries({ queryKey: ["exports", productId] });
+      const result = await executeExport.mutateAsync(exportOptions);
 
       toast({
         title: "Export complete",
-        description: `Exported ${filteredEntities.length} items.`,
+        description: `Exported ${result.counts.total} items to ${result.outputPath}`,
       });
+
+      // Offer to open the folder
+      if (result.outputPath) {
+        openFolder.mutate(result.outputPath);
+      }
     } catch (error) {
       toast({
         title: "Export failed",
-        description: "Something went wrong.",
+        description: String(error),
         variant: "destructive",
       });
-    } finally {
-      setIsExporting(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await clearHistory.mutateAsync(productId);
+      toast({
+        title: "History cleared",
+        description: "Export history has been cleared.",
+      });
+      setShowClearDialog(false);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to clear history.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenFolder = (path: string) => {
+    openFolder.mutate(path);
+  };
+
+  const handleCopySnapshot = async () => {
+    if (!productId) return;
+
+    try {
+      const snapshot = await copySnapshot.mutateAsync(productId);
+      await navigator.clipboard.writeText(snapshot);
+      toast({
+        title: "Copied to clipboard",
+        description: "Product snapshot is ready to paste into your AI chat.",
+      });
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: String(error),
+        variant: "destructive",
+      });
     }
   };
 
@@ -181,7 +185,7 @@ export default function ExportsPage() {
             {/* Mode Selection */}
             <div className="space-y-2.5">
               <Label className="text-sm">Export Mode</Label>
-              <RadioGroup value={mode} onValueChange={(v) => setMode(v as "full" | "incremental")}>
+              <RadioGroup value={mode} onValueChange={(v) => setMode(v as ExportMode)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="full" id="full" />
                   <Label htmlFor="full" className="text-sm font-normal">
@@ -227,15 +231,18 @@ export default function ExportsPage() {
                   )}
                 </div>
 
-                {/* Include Parents */}
+                {/* Include Linked Context */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
-                    <Label className="text-sm">Include parent context</Label>
+                    <Label className="text-sm">Include linked context</Label>
                     <p className="text-xs text-muted-foreground">
-                      Include linked problems/hypotheses for coherence
+                      Include linked entities for coherence
                     </p>
                   </div>
-                  <Switch checked={includeParents} onCheckedChange={setIncludeParents} />
+                  <Switch
+                    checked={includeLinkedContext}
+                    onCheckedChange={setIncludeLinkedContext}
+                  />
                 </div>
               </>
             )}
@@ -245,38 +252,73 @@ export default function ExportsPage() {
             {/* Preview */}
             <div className="space-y-2">
               <Label className="text-sm">Preview</Label>
-              <div className="rounded-md border border-border/50 bg-muted/30 p-3 text-sm text-muted-foreground">
-                {mode === "full" ? (
-                  <p>{entities?.length || 0} items will be exported</p>
+              <div className="rounded-md border border-border/50 bg-muted/30 p-3">
+                {previewLoading ? (
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                ) : preview ? (
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium">
+                      {preview.counts.total} items will be exported
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(preview.counts.byType)
+                        .filter(([, count]) => count > 0)
+                        .map(([type, count]) => (
+                          <Badge
+                            key={type}
+                            variant="secondary"
+                            className="h-5 px-1.5 text-[10px]"
+                          >
+                            {count} {TYPE_LABELS[type as EntityType]}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
                 ) : (
-                  <p>
-                    Items created or updated since{" "}
-                    {sinceDate
-                      ? format(new Date(sinceDate), "MMM d, yyyy")
-                      : lastExportDate
-                      ? format(new Date(lastExportDate), "MMM d, yyyy")
-                      : "the beginning"}
+                  <p className="text-sm text-muted-foreground">
+                    {mode === "full" ? "All items" : "Configure options to see preview"}
                   </p>
                 )}
               </div>
             </div>
 
-            <Button onClick={handleExport} disabled={isExporting} size="sm" className="w-full">
-              {isExporting ? "Exporting..." : "Download Export"}
+            <Button
+              onClick={handleExport}
+              disabled={executeExport.isPending || !preview || preview.counts.total === 0}
+              size="sm"
+              className="w-full"
+            >
+              {executeExport.isPending ? "Exporting..." : "Download Export"}
             </Button>
           </CardContent>
         </Card>
 
         {/* Export History */}
         <Card className="border-border/50 shadow-xs">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Clock className="h-4 w-4" />
-              Export History
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Previous exports from this product
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4" />
+                Export History
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Previous exports from this product
+              </CardDescription>
+            </div>
+            {exportHistory && exportHistory.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs text-muted-foreground"
+                onClick={() => setShowClearDialog(true)}
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {historyLoading ? (
@@ -291,33 +333,51 @@ export default function ExportsPage() {
             ) : (
               <div className="space-y-2">
                 {[...exportHistory]
-                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .sort(
+                    (a, b) =>
+                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                  )
                   .slice(0, 10)
                   .map((record) => (
                     <div
                       key={record.id}
                       className="flex items-center justify-between rounded-md border border-border/50 p-3"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <Badge 
-                            variant={record.mode === "full" ? "default" : "secondary"} 
+                          <Badge
+                            variant={record.mode === "full" ? "default" : "secondary"}
                             className="h-5 px-1.5 text-[10px] font-medium"
                           >
                             {record.mode}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(record.timestamp), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(record.createdAt), {
+                              addSuffix: true,
+                            })}
                           </span>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {Object.entries(record.counts)
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {Object.entries(record.counts.byType)
                             .filter(([, count]) => count > 0)
-                            .map(([type, count]) => `${count} ${type}${count > 1 ? "s" : ""}`)
+                            .map(
+                              ([type, count]) =>
+                                `${count} ${type}${count > 1 ? "s" : ""}`
+                            )
                             .join(", ")}
                         </p>
                       </div>
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      {record.outputPath && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleOpenFolder(record.outputPath!)}
+                          title="Open folder"
+                        >
+                          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
                     </div>
                   ))}
               </div>
@@ -325,204 +385,60 @@ export default function ExportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Copy Snapshot */}
+      <Card className="mt-4 border-border/50 shadow-xs">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Copy className="h-4 w-4" />
+            Copy Snapshot
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Copy a summary of your product state for AI chat context
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Generates a markdown summary including active problems, running experiments,
+              recent decisions, and open questions.
+            </p>
+            <Button
+              onClick={handleCopySnapshot}
+              disabled={copySnapshot.isPending}
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+            >
+              {copySnapshot.isPending ? (
+                <>Generating...</>
+              ) : (
+                <>
+                  <ClipboardCheck className="h-4 w-4" />
+                  Copy to Clipboard
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Clear History Dialog */}
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Export History?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all export records from history. The exported files will not
+              be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearHistory}>Clear</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-}
-
-interface ExportBundle {
-  manifest: {
-    productName: string;
-    exportedAt: string;
-    counts: Record<string, number>;
-  };
-  files: { path: string; content: string }[];
-}
-
-function generateExportBundle(
-  productName: string,
-  entities: Entity[],
-  taxonomy: any
-): ExportBundle {
-  const files: { path: string; content: string }[] = [];
-  const counts: Record<string, number> = {};
-
-  entities.forEach((entity) => {
-    counts[entity.type] = (counts[entity.type] || 0) + 1;
-
-    const filename = `${entity.type}s/${sanitizeFilename(entity.title)}-${entity.id.slice(0, 8)}.md`;
-    const content = entityToMarkdown(entity, taxonomy);
-    files.push({ path: filename, content });
-  });
-
-  // Add manifest
-  const manifest = {
-    productName,
-    exportedAt: new Date().toISOString(),
-    counts,
-  };
-
-  files.push({
-    path: "manifest.json",
-    content: JSON.stringify(manifest, null, 2),
-  });
-
-  // Add snapshot overview
-  const snapshot = generateSnapshotMarkdown(productName, entities, counts);
-  files.push({ path: "snapshot.md", content: snapshot });
-
-  return { manifest, files };
-}
-
-function entityToMarkdown(entity: Entity, taxonomy: any): string {
-  const lines: string[] = [];
-
-  lines.push(`# ${entity.title}`);
-  lines.push("");
-  lines.push(`**Type:** ${entity.type}`);
-  lines.push(`**Created:** ${format(new Date(entity.createdAt), "yyyy-MM-dd HH:mm")}`);
-  lines.push(`**Updated:** ${format(new Date(entity.updatedAt), "yyyy-MM-dd HH:mm")}`);
-
-  // Type-specific fields
-  if (entity.type === "problem") {
-    lines.push(`**Status:** ${(entity as any).status}`);
-  } else if (entity.type === "experiment") {
-    lines.push(`**Status:** ${(entity as any).status}`);
-    if ((entity as any).outcome) {
-      lines.push(`**Outcome:** ${(entity as any).outcome}`);
-    }
-  } else if (entity.type === "decision") {
-    if ((entity as any).decisionType) {
-      lines.push(`**Decision Type:** ${(entity as any).decisionType}`);
-    }
-    if ((entity as any).decidedAt) {
-      lines.push(`**Decided:** ${format(new Date((entity as any).decidedAt), "yyyy-MM-dd")}`);
-    }
-  } else if (entity.type === "artifact") {
-    lines.push(`**Artifact Type:** ${(entity as any).artifactType}`);
-    if ((entity as any).source) {
-      lines.push(`**Source:** ${(entity as any).source}`);
-    }
-  }
-
-  lines.push("");
-
-  // Context tags
-  const contextTags: string[] = [];
-  if (entity.personaIds.length > 0) {
-    const names = entity.personaIds
-      .map((id) => taxonomy.personas.find((p: any) => p.id === id)?.name)
-      .filter(Boolean);
-    if (names.length > 0) contextTags.push(`Personas: ${names.join(", ")}`);
-  }
-  if (entity.featureAreaIds.length > 0) {
-    const names = entity.featureAreaIds
-      .map((id) => taxonomy.featureAreas.find((f: any) => f.id === id)?.name)
-      .filter(Boolean);
-    if (names.length > 0) contextTags.push(`Features: ${names.join(", ")}`);
-  }
-
-  if (contextTags.length > 0) {
-    lines.push("## Context");
-    contextTags.forEach((tag) => lines.push(`- ${tag}`));
-    lines.push("");
-  }
-
-  // Body content
-  if (entity.body) {
-    lines.push("## Content");
-    lines.push("");
-    // Strip HTML for markdown export
-    lines.push(stripHtml(entity.body));
-    lines.push("");
-  }
-
-  // Linked items
-  const linkedIds = entity.linkedIds || {};
-  const hasLinks = Object.values(linkedIds).some((arr) => arr && arr.length > 0);
-  if (hasLinks) {
-    lines.push("## Linked Items");
-    Object.entries(linkedIds).forEach(([type, ids]) => {
-      if (ids && ids.length > 0) {
-        lines.push(`- ${type}: ${ids.length} item(s)`);
-      }
-    });
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
-function generateSnapshotMarkdown(
-  productName: string,
-  entities: Entity[],
-  counts: Record<string, number>
-): string {
-  const lines: string[] = [];
-
-  lines.push(`# ${productName} - Export Snapshot`);
-  lines.push("");
-  lines.push(`Exported: ${format(new Date(), "yyyy-MM-dd HH:mm")}`);
-  lines.push("");
-  lines.push("## Summary");
-  lines.push("");
-  Object.entries(counts).forEach(([type, count]) => {
-    lines.push(`- **${type}s:** ${count}`);
-  });
-  lines.push("");
-  lines.push("## Recent Activity");
-  lines.push("");
-
-  const recent = [...entities]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 10);
-
-  recent.forEach((e) => {
-    lines.push(`- [${e.type}] ${e.title} (${format(new Date(e.updatedAt), "MMM d")})`);
-  });
-
-  return lines.join("\n");
-}
-
-function sanitizeFilename(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .trim();
-}
-
-function downloadBundle(bundle: ExportBundle, productName: string) {
-  // For simplicity, download as a single JSON file containing all markdown
-  // In a real app, you'd use JSZip to create an actual zip
-  const content = JSON.stringify(
-    {
-      manifest: bundle.manifest,
-      files: bundle.files.reduce((acc, f) => {
-        acc[f.path] = f.content;
-        return acc;
-      }, {} as Record<string, string>),
-    },
-    null,
-    2
-  );
-
-  const blob = new Blob([content], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${sanitizeFilename(productName)}-export-${format(new Date(), "yyyy-MM-dd")}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }

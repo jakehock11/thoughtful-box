@@ -15,6 +15,10 @@ import type {
   Relationship,
   RelationshipWithEntity,
   CreateRelationshipData,
+  ExportOptions,
+  ExportPreview,
+  ExportResult,
+  ExportRecord,
   IPCResult,
   WorkspaceSelectResult,
   WorkspacePathResult,
@@ -267,6 +271,39 @@ export const api = {
       unwrapVoid(result);
     },
   },
+
+  // Export operations
+  exports: {
+    getPreview: async (options: ExportOptions): Promise<ExportPreview> => {
+      const result = await window.api.exports.getPreview(options) as IPCResult<ExportPreview>;
+      return unwrap(result);
+    },
+
+    execute: async (options: ExportOptions): Promise<ExportResult> => {
+      const result = await window.api.exports.execute(options) as IPCResult<ExportResult>;
+      return unwrap(result);
+    },
+
+    getHistory: async (productId?: string): Promise<ExportRecord[]> => {
+      const result = await window.api.exports.getHistory(productId) as IPCResult<ExportRecord[]>;
+      return unwrap(result);
+    },
+
+    clearHistory: async (productId?: string): Promise<void> => {
+      const result = await window.api.exports.clearHistory(productId) as IPCResult;
+      unwrapVoid(result);
+    },
+
+    openFolder: async (folderPath: string): Promise<void> => {
+      const result = await window.api.exports.openFolder(folderPath) as IPCResult;
+      unwrapVoid(result);
+    },
+
+    copySnapshot: async (productId: string): Promise<string> => {
+      const result = await window.api.exports.copySnapshot(productId) as IPCResult<string>;
+      return unwrap(result);
+    },
+  },
 };
 
 // ============================================
@@ -299,15 +336,19 @@ declare global {
         createPersona: (productId: string, name: string) => Promise<IPCResult<Persona>>;
         updatePersona: (id: string, data: { name?: string }) => Promise<IPCResult<Persona>>;
         archivePersona: (id: string) => Promise<IPCResult>;
+        unarchivePersona: (id: string) => Promise<IPCResult<Persona>>;
         createFeature: (productId: string, name: string) => Promise<IPCResult<Feature>>;
         updateFeature: (id: string, data: { name?: string }) => Promise<IPCResult<Feature>>;
         archiveFeature: (id: string) => Promise<IPCResult>;
+        unarchiveFeature: (id: string) => Promise<IPCResult<Feature>>;
         createDimension: (productId: string, name: string) => Promise<IPCResult<Dimension>>;
         updateDimension: (id: string, data: { name?: string }) => Promise<IPCResult<Dimension>>;
         archiveDimension: (id: string) => Promise<IPCResult>;
+        unarchiveDimension: (id: string) => Promise<IPCResult<Dimension>>;
         createDimensionValue: (dimensionId: string, name: string) => Promise<IPCResult<DimensionValue>>;
         updateDimensionValue: (id: string, data: { name?: string }) => Promise<IPCResult<DimensionValue>>;
         archiveDimensionValue: (id: string) => Promise<IPCResult>;
+        unarchiveDimensionValue: (id: string) => Promise<IPCResult<DimensionValue>>;
       };
       entities: {
         getAll: (productId: string, filters?: EntityFilters) => Promise<IPCResult<Entity[]>>;
@@ -323,6 +364,14 @@ declare global {
         getIncoming: (entityId: string) => Promise<IPCResult<RelationshipWithEntity[]>>;
         create: (data: CreateRelationshipData) => Promise<IPCResult<Relationship>>;
         delete: (id: string, sourceEntityId?: string) => Promise<IPCResult>;
+      };
+      exports: {
+        getPreview: (options: ExportOptions) => Promise<IPCResult<ExportPreview>>;
+        execute: (options: ExportOptions) => Promise<IPCResult<ExportResult>>;
+        getHistory: (productId?: string) => Promise<IPCResult<ExportRecord[]>>;
+        clearHistory: (productId?: string) => Promise<IPCResult>;
+        openFolder: (folderPath: string) => Promise<IPCResult>;
+        copySnapshot: (productId: string) => Promise<IPCResult<string>>;
       };
     };
   }
