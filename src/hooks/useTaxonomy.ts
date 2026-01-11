@@ -82,6 +82,18 @@ export function useArchivePersona() {
   });
 }
 
+export function useUnarchivePersona() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, productId }: { id: string; productId: string }) =>
+      api.taxonomy.unarchivePersona(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...TAXONOMY_KEY, variables.productId] });
+    },
+  });
+}
+
 // ============================================
 // Feature Mutations
 // ============================================
@@ -122,6 +134,18 @@ export function useArchiveFeature() {
   });
 }
 
+export function useUnarchiveFeature() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, productId }: { id: string; productId: string }) =>
+      api.taxonomy.unarchiveFeature(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...TAXONOMY_KEY, variables.productId] });
+    },
+  });
+}
+
 // ============================================
 // Dimension Mutations
 // ============================================
@@ -156,6 +180,18 @@ export function useArchiveDimension() {
   return useMutation({
     mutationFn: ({ id, productId }: { id: string; productId: string }) =>
       api.taxonomy.archiveDimension(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...TAXONOMY_KEY, variables.productId] });
+    },
+  });
+}
+
+export function useUnarchiveDimension() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, productId }: { id: string; productId: string }) =>
+      api.taxonomy.unarchiveDimension(id),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [...TAXONOMY_KEY, variables.productId] });
     },
@@ -210,6 +246,18 @@ export function useArchiveDimensionValue() {
   return useMutation({
     mutationFn: ({ id, productId }: { id: string; productId: string }) =>
       api.taxonomy.archiveDimensionValue(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...TAXONOMY_KEY, variables.productId] });
+    },
+  });
+}
+
+export function useUnarchiveDimensionValue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, productId }: { id: string; productId: string }) =>
+      api.taxonomy.unarchiveDimensionValue(id),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [...TAXONOMY_KEY, variables.productId] });
     },

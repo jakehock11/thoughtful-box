@@ -219,6 +219,8 @@ const api = {
       ipcRenderer.invoke('taxonomy:updatePersona', id, data) as Promise<IPCResult<Persona>>,
     archivePersona: (id: string) =>
       ipcRenderer.invoke('taxonomy:archivePersona', id) as Promise<IPCResult>,
+    unarchivePersona: (id: string) =>
+      ipcRenderer.invoke('taxonomy:unarchivePersona', id) as Promise<IPCResult<Persona>>,
 
     // Features
     createFeature: (productId: string, name: string) =>
@@ -227,6 +229,8 @@ const api = {
       ipcRenderer.invoke('taxonomy:updateFeature', id, data) as Promise<IPCResult<Feature>>,
     archiveFeature: (id: string) =>
       ipcRenderer.invoke('taxonomy:archiveFeature', id) as Promise<IPCResult>,
+    unarchiveFeature: (id: string) =>
+      ipcRenderer.invoke('taxonomy:unarchiveFeature', id) as Promise<IPCResult<Feature>>,
 
     // Dimensions
     createDimension: (productId: string, name: string) =>
@@ -235,6 +239,8 @@ const api = {
       ipcRenderer.invoke('taxonomy:updateDimension', id, data) as Promise<IPCResult<Dimension>>,
     archiveDimension: (id: string) =>
       ipcRenderer.invoke('taxonomy:archiveDimension', id) as Promise<IPCResult>,
+    unarchiveDimension: (id: string) =>
+      ipcRenderer.invoke('taxonomy:unarchiveDimension', id) as Promise<IPCResult<Dimension>>,
 
     // Dimension Values
     createDimensionValue: (dimensionId: string, name: string) =>
@@ -243,6 +249,8 @@ const api = {
       ipcRenderer.invoke('taxonomy:updateDimensionValue', id, data) as Promise<IPCResult<DimensionValue>>,
     archiveDimensionValue: (id: string) =>
       ipcRenderer.invoke('taxonomy:archiveDimensionValue', id) as Promise<IPCResult>,
+    unarchiveDimensionValue: (id: string) =>
+      ipcRenderer.invoke('taxonomy:unarchiveDimensionValue', id) as Promise<IPCResult<DimensionValue>>,
   },
 
   // Entities namespace

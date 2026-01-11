@@ -224,6 +224,21 @@ export function archivePersona(id: string): void {
   if (result.changes === 0) throw new Error(`Persona not found: ${id}`);
 }
 
+export function unarchivePersona(id: string): Persona {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = db.prepare(`
+    UPDATE personas SET is_archived = 0, updated_at = ? WHERE id = ?
+  `).run(now, id);
+
+  if (result.changes === 0) throw new Error(`Persona not found: ${id}`);
+
+  const persona = getPersonaById(id);
+  if (!persona) throw new Error('Failed to retrieve unarchived persona');
+  return persona;
+}
+
 // ============================================
 // Feature Functions
 // ============================================
@@ -292,6 +307,21 @@ export function archiveFeature(id: string): void {
   `).run(now, id);
 
   if (result.changes === 0) throw new Error(`Feature not found: ${id}`);
+}
+
+export function unarchiveFeature(id: string): Feature {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = db.prepare(`
+    UPDATE features SET is_archived = 0, updated_at = ? WHERE id = ?
+  `).run(now, id);
+
+  if (result.changes === 0) throw new Error(`Feature not found: ${id}`);
+
+  const feature = getFeatureById(id);
+  if (!feature) throw new Error('Failed to retrieve unarchived feature');
+  return feature;
 }
 
 // ============================================
@@ -381,6 +411,21 @@ export function archiveDimension(id: string): void {
   if (result.changes === 0) throw new Error(`Dimension not found: ${id}`);
 }
 
+export function unarchiveDimension(id: string): Dimension {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = db.prepare(`
+    UPDATE dimensions SET is_archived = 0, updated_at = ? WHERE id = ?
+  `).run(now, id);
+
+  if (result.changes === 0) throw new Error(`Dimension not found: ${id}`);
+
+  const dimension = getDimensionById(id);
+  if (!dimension) throw new Error('Failed to retrieve unarchived dimension');
+  return dimension;
+}
+
 // ============================================
 // Dimension Value Functions
 // ============================================
@@ -449,6 +494,21 @@ export function archiveDimensionValue(id: string): void {
   `).run(now, id);
 
   if (result.changes === 0) throw new Error(`Dimension value not found: ${id}`);
+}
+
+export function unarchiveDimensionValue(id: string): DimensionValue {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = db.prepare(`
+    UPDATE dimension_values SET is_archived = 0, updated_at = ? WHERE id = ?
+  `).run(now, id);
+
+  if (result.changes === 0) throw new Error(`Dimension value not found: ${id}`);
+
+  const value = getDimensionValueById(id);
+  if (!value) throw new Error('Failed to retrieve unarchived dimension value');
+  return value;
 }
 
 // ============================================

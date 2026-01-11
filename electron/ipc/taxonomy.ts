@@ -5,18 +5,22 @@ import {
   createPersona,
   updatePersona,
   archivePersona,
+  unarchivePersona,
   getFeatures,
   createFeature,
   updateFeature,
   archiveFeature,
+  unarchiveFeature,
   getDimensions,
   createDimension,
   updateDimension,
   archiveDimension,
+  unarchiveDimension,
   getDimensionValues,
   createDimensionValue,
   updateDimensionValue,
   archiveDimensionValue,
+  unarchiveDimensionValue,
 } from '../database/queries/taxonomy';
 
 export function registerTaxonomyHandlers(): void {
@@ -70,6 +74,15 @@ export function registerTaxonomyHandlers(): void {
     }
   });
 
+  ipcMain.handle('taxonomy:unarchivePersona', (_, id: string) => {
+    try {
+      const persona = unarchivePersona(id);
+      return { success: true, data: persona };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
   // ============================================
   // Feature Handlers
   // ============================================
@@ -105,6 +118,15 @@ export function registerTaxonomyHandlers(): void {
     try {
       archiveFeature(id);
       return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taxonomy:unarchiveFeature', (_, id: string) => {
+    try {
+      const feature = unarchiveFeature(id);
+      return { success: true, data: feature };
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -150,6 +172,15 @@ export function registerTaxonomyHandlers(): void {
     }
   });
 
+  ipcMain.handle('taxonomy:unarchiveDimension', (_, id: string) => {
+    try {
+      const dimension = unarchiveDimension(id);
+      return { success: true, data: dimension };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
   // ============================================
   // Dimension Value Handlers
   // ============================================
@@ -185,6 +216,15 @@ export function registerTaxonomyHandlers(): void {
     try {
       archiveDimensionValue(id);
       return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('taxonomy:unarchiveDimensionValue', (_, id: string) => {
+    try {
+      const value = unarchiveDimensionValue(id);
+      return { success: true, data: value };
     } catch (error) {
       return { success: false, error: String(error) };
     }

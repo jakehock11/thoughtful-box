@@ -138,6 +138,11 @@ export const api = {
       unwrapVoid(result);
     },
 
+    unarchivePersona: async (id: string): Promise<Persona> => {
+      const result = await window.api.taxonomy.unarchivePersona(id) as IPCResult<Persona>;
+      return unwrap(result);
+    },
+
     // Features
     createFeature: async (productId: string, name: string): Promise<Feature> => {
       const result = await window.api.taxonomy.createFeature(productId, name) as IPCResult<Feature>;
@@ -152,6 +157,11 @@ export const api = {
     archiveFeature: async (id: string): Promise<void> => {
       const result = await window.api.taxonomy.archiveFeature(id) as IPCResult;
       unwrapVoid(result);
+    },
+
+    unarchiveFeature: async (id: string): Promise<Feature> => {
+      const result = await window.api.taxonomy.unarchiveFeature(id) as IPCResult<Feature>;
+      return unwrap(result);
     },
 
     // Dimensions
@@ -170,6 +180,11 @@ export const api = {
       unwrapVoid(result);
     },
 
+    unarchiveDimension: async (id: string): Promise<Dimension> => {
+      const result = await window.api.taxonomy.unarchiveDimension(id) as IPCResult<Dimension>;
+      return unwrap(result);
+    },
+
     // Dimension Values
     createDimensionValue: async (dimensionId: string, name: string): Promise<DimensionValue> => {
       const result = await window.api.taxonomy.createDimensionValue(dimensionId, name) as IPCResult<DimensionValue>;
@@ -184,6 +199,11 @@ export const api = {
     archiveDimensionValue: async (id: string): Promise<void> => {
       const result = await window.api.taxonomy.archiveDimensionValue(id) as IPCResult;
       unwrapVoid(result);
+    },
+
+    unarchiveDimensionValue: async (id: string): Promise<DimensionValue> => {
+      const result = await window.api.taxonomy.unarchiveDimensionValue(id) as IPCResult<DimensionValue>;
+      return unwrap(result);
     },
   },
 
