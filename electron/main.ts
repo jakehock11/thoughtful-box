@@ -11,8 +11,6 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-
 // Test IPC handler
 ipcMain.handle('ping', () => 'pong');
 
@@ -41,16 +39,32 @@ function createWindow() {
     show: false, // Don't show until ready
   });
 
-  // Load the app
+  // Determine environment at runtime (not module load time)
+  const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
+  
+  console.log('Environment:', {
+    isPackaged: app.isPackaged,
+    NODE_ENV: process.env.NODE_ENV,
+    isDev: isDev
+  });
+
+  // Load the app based on environment
   if (isDev) {
-    // In development, load from Vite dev server
-    // Try common dev server ports
+    // electron:dev - Load from Vite dev server
     const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:8080';
+    console.log('Loading dev server:', devServerUrl);
     mainWindow.loadURL(devServerUrl);
     mainWindow.webContents.openDevTools();
+  } else if (app.isPackaged) {
+    // electron:build - Packaged app, use app.getAppPath() for reliable path resolution
+    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+    console.log('Loading packaged app:', indexPath);
+    mainWindow.loadFile(indexPath);
   } else {
-    // In production, load the built files
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // electron:preview - Built files, not packaged
+    const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
+    console.log('Loading preview:', indexPath);
+    mainWindow.loadFile(indexPath);
   }
 
   // Show window when ready to avoid flash

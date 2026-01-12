@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "electron:dev": "vite",
     "electron:build": "vite build && electron-builder",
-    "electron:preview": "vite build && electron .",
+    "electron:preview": "vite build && cross-env NODE_ENV=production electron .",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
@@ -84,6 +84,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "electron": "^39.2.7",
     "electron-builder": "^26.4.0",
     "eslint": "^9.32.0",
@@ -114,7 +115,8 @@
       "target": "dmg"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "signAndEditExecutable": false
     },
     "linux": {
       "target": "AppImage"
