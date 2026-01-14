@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DatePicker } from '@/components/ui/date-picker';
 import { RichTextEditor } from '@/components/editor';
 import { ContextTagsPicker } from '@/components/taxonomy';
 import { LinkToModal, LinkedItems } from '@/components/linking';
@@ -61,6 +62,8 @@ export default function ExperimentDetailPage() {
   const [body, setBody] = useState('');
   const [status, setStatus] = useState<ExperimentStatus>('planned');
   const [outcome, setOutcome] = useState<ExperimentOutcome | undefined>();
+  const [startDate, setStartDate] = useState<string | undefined>();
+  const [endDate, setEndDate] = useState<string | undefined>();
   const [personaIds, setPersonaIds] = useState<string[]>([]);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
@@ -80,6 +83,8 @@ export default function ExperimentDetailPage() {
       setBody(entity.body);
       setStatus((entity.status as ExperimentStatus) || 'planned');
       setOutcome(entity.metadata?.outcome as ExperimentOutcome | undefined);
+      setStartDate(entity.metadata?.startDate);
+      setEndDate(entity.metadata?.endDate);
       setPersonaIds(entity.personaIds || []);
       setFeatureIds(entity.featureIds || []);
       setDimensionValueIds(entity.dimensionValueIds || []);
@@ -103,6 +108,8 @@ export default function ExperimentDetailPage() {
             metadata: {
               ...entity.metadata,
               outcome,
+              startDate,
+              endDate,
             },
           },
         });
@@ -125,6 +132,8 @@ export default function ExperimentDetailPage() {
       body,
       status,
       outcome,
+      startDate,
+      endDate,
       personaIds,
       featureIds,
       dimensionValueIds,
@@ -142,7 +151,7 @@ export default function ExperimentDetailPage() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, body, status, outcome, personaIds, featureIds, dimensionValueIds]);
+  }, [title, body, status, outcome, startDate, endDate, personaIds, featureIds, dimensionValueIds]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -298,6 +307,24 @@ export default function ExperimentDetailPage() {
                 </Select>
               </div>
             )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Start Date</Label>
+              <DatePicker
+                value={startDate ? new Date(startDate) : undefined}
+                onChange={(date) => setStartDate(date ? date.toISOString() : undefined)}
+                placeholder="Select date"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">End Date</Label>
+              <DatePicker
+                value={endDate ? new Date(endDate) : undefined}
+                onChange={(date) => setEndDate(date ? date.toISOString() : undefined)}
+                placeholder="Select date"
+              />
+            </div>
 
             <Badge variant="outline" className="text-xs font-medium">
               Experiment

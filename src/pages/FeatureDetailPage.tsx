@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Package, ArrowLeft, Trash2, Link2, Plus, Calendar } from 'lucide-react';
+import { Package, ArrowLeft, Trash2, Link2, Plus } from 'lucide-react';
 import { useProductContext } from '@/contexts/ProductContext';
 import { useEntity, useUpdateEntity, useDeleteEntity } from '@/hooks/useEntities';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { RichTextEditor } from '@/components/editor';
 import { ContextTagsPicker } from '@/components/taxonomy';
 import { LinkToModal, LinkedItems } from '@/components/linking';
@@ -282,54 +283,53 @@ export default function FeatureDetailPage() {
         />
 
         {/* Metadata Row */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={status} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  <Badge variant="outline" className={`${STATUS_COLORS[s.value]} border-0`}>
-                    {s.label}
-                  </Badge>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex items-center gap-2">
-            <div className={`h-3 w-3 rounded-full ${HEALTH_COLORS[health]}`} />
-            <Select value={health} onValueChange={handleHealthChange}>
-              <SelectTrigger className="w-40 border-0 bg-transparent p-0 h-auto font-medium text-sm">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={status} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-32 h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {HEALTH_OPTIONS.map((h) => (
-                  <SelectItem key={h.value} value={h.value}>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${h.color}`} />
-                      {h.label}
-                    </div>
+                {STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    <Badge variant="outline" className={`${STATUS_COLORS[s.value]} border-0`}>
+                      {s.label}
+                    </Badge>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        </div>
 
-        {/* Shipped At */}
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Shipped Date</Label>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={shippedAt ? format(new Date(shippedAt), 'yyyy-MM-dd') : ''}
-              onChange={(e) =>
-                handleShippedAtChange(e.target.value ? new Date(e.target.value).toISOString() : '')
-              }
-              className="h-9 w-40"
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Health</Label>
+            <div className="flex items-center gap-2 h-9">
+              <div className={`h-3 w-3 rounded-full ${HEALTH_COLORS[health]}`} />
+              <Select value={health} onValueChange={handleHealthChange}>
+                <SelectTrigger className="w-36 border-0 bg-transparent p-0 h-auto font-medium text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {HEALTH_OPTIONS.map((h) => (
+                    <SelectItem key={h.value} value={h.value}>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-2 w-2 rounded-full ${h.color}`} />
+                        {h.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Shipped Date</Label>
+            <DatePicker
+              value={shippedAt ? new Date(shippedAt) : undefined}
+              onChange={(date) => handleShippedAtChange(date ? date.toISOString() : '')}
+              placeholder="Select date"
             />
           </div>
         </div>

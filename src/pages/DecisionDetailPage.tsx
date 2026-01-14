@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DatePicker } from '@/components/ui/date-picker';
 import { RichTextEditor } from '@/components/editor';
 import { ContextTagsPicker } from '@/components/taxonomy';
 import { LinkToModal, LinkedItems } from '@/components/linking';
@@ -53,6 +54,7 @@ export default function DecisionDetailPage() {
   const [body, setBody] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const [decidedAt, setDecidedAt] = useState<string | undefined>();
+  const [revisitAt, setRevisitAt] = useState<string | undefined>();
   const [personaIds, setPersonaIds] = useState<string[]>([]);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
@@ -72,6 +74,7 @@ export default function DecisionDetailPage() {
       setBody(entity.body);
       setDecisionType(entity.metadata?.decisionType);
       setDecidedAt(entity.metadata?.decidedAt);
+      setRevisitAt(entity.metadata?.revisitAt);
       setPersonaIds(entity.personaIds || []);
       setFeatureIds(entity.featureIds || []);
       setDimensionValueIds(entity.dimensionValueIds || []);
@@ -95,6 +98,7 @@ export default function DecisionDetailPage() {
               ...entity.metadata,
               decisionType,
               decidedAt,
+              revisitAt,
             },
           },
         });
@@ -117,6 +121,7 @@ export default function DecisionDetailPage() {
       body,
       decisionType,
       decidedAt,
+      revisitAt,
       personaIds,
       featureIds,
       dimensionValueIds,
@@ -134,7 +139,7 @@ export default function DecisionDetailPage() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [title, body, decisionType, decidedAt, personaIds, featureIds, dimensionValueIds]);
+  }, [title, body, decisionType, decidedAt, revisitAt, personaIds, featureIds, dimensionValueIds]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -160,10 +165,6 @@ export default function DecisionDetailPage() {
       feature: 'features',
     };
     navigate(`/product/${productId}/${pathMap[entityType]}/${entityId}`);
-  };
-
-  const handleSetDecidedNow = () => {
-    setDecidedAt(new Date().toISOString());
   };
 
   if (isLoading) {
@@ -279,15 +280,20 @@ export default function DecisionDetailPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Decided</Label>
-              {decidedAt ? (
-                <p className="text-sm h-8 flex items-center">
-                  {format(new Date(decidedAt), 'MMM d, yyyy')}
-                </p>
-              ) : (
-                <Button variant="outline" size="sm" onClick={handleSetDecidedNow} className="h-8">
-                  Mark as Decided
-                </Button>
-              )}
+              <DatePicker
+                value={decidedAt ? new Date(decidedAt) : undefined}
+                onChange={(date) => setDecidedAt(date ? date.toISOString() : undefined)}
+                placeholder="Select date"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Revisit Date</Label>
+              <DatePicker
+                value={revisitAt ? new Date(revisitAt) : undefined}
+                onChange={(date) => setRevisitAt(date ? date.toISOString() : undefined)}
+                placeholder="Select date"
+              />
             </div>
 
             <Badge variant="outline" className="text-xs font-medium">

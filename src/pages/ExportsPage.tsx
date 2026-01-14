@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -210,11 +211,11 @@ export default function ExportsPage() {
                 <div className="space-y-2">
                   <Label className="text-sm">Since Date</Label>
                   <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      value={sinceDate}
-                      onChange={(e) => setSinceDate(e.target.value)}
-                      className="h-9 flex-1 text-sm"
+                    <DatePicker
+                      value={sinceDate ? new Date(sinceDate + 'T00:00:00') : undefined}
+                      onChange={(date) => setSinceDate(date ? format(date, 'yyyy-MM-dd') : '')}
+                      placeholder="Select date"
+                      className="flex-1"
                     />
                     {lastExportDate && (
                       <Button
