@@ -22,6 +22,7 @@ import DecisionDetailPage from "./pages/DecisionDetailPage";
 import ArtifactsPage from "./pages/ArtifactsPage";
 import ArtifactDetailPage from "./pages/ArtifactDetailPage";
 import TimelinePage from "./pages/TimelinePage";
+import { SwimLaneTimeline } from "./components/timeline";
 import TaxonomyPage from "./pages/TaxonomyPage";
 import ExportsPage from "./pages/ExportsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/product/:productId/artifacts" element={<ArtifactsPage />} />
                 <Route path="/product/:productId/artifacts/:id" element={<ArtifactDetailPage />} />
                 <Route path="/product/:productId/timeline" element={<TimelinePage />} />
+                <Route path="/product/:productId/swimlane" element={<div className="p-6 h-[calc(100vh-4rem)]"><SwimLaneTimeline /></div>} />
                 <Route path="/product/:productId/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/product/:productId/exports" element={<ExportsPage />} />
                 <Route path="/product/:productId/settings" element={<SettingsPage />} />
