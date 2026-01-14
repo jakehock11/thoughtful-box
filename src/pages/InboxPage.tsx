@@ -12,23 +12,40 @@ import {
   FlaskConical,
   CheckCircle,
   Package,
+  Trash2,
 } from "lucide-react";
 import { useProductContext } from "@/contexts/ProductContext";
-import { useEntities, usePromoteCapture } from "@/hooks/useEntities";
+import { useEntities, usePromoteCapture, useDeleteEntity } from "@/hooks/useEntities";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
+import { InboxCaptureForm } from "@/components/inbox";
 import type { Entity, EntityType } from "@/lib/types";
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; route: string; color: string }> = {
@@ -45,16 +62,19 @@ const PROMOTE_OPTIONS: { type: EntityType; label: string; icon: React.ElementTyp
   { type: "feature", label: "Feature", icon: Package },
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  new: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  reviewed: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-  actioned: "bg-green-500/10 text-green-600 border-green-500/20",
-  archived: "bg-gray-500/10 text-gray-500 border-gray-500/20",
-  considering: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  planned: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
-  in_progress: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  shipped: "bg-green-500/10 text-green-600 border-green-500/20",
-  declined: "bg-red-500/10 text-red-600 border-red-500/20",
+const SENTIMENT_STYLES: Record<string, string> = {
+  praise: "bg-green-500/10 text-green-600 border-green-500/20",
+  suggestion: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  complaint: "bg-red-500/10 text-red-600 border-red-500/20",
+  bug: "bg-red-500/10 text-red-600 border-red-500/20",
+  question: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+};
+
+const PRIORITY_STYLES: Record<string, string> = {
+  low: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+  medium: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  high: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  critical: "bg-red-500/10 text-red-600 border-red-500/20",
 };
 
 type TabValue = "all" | "capture" | "feedback" | "feature_request";
@@ -66,11 +86,15 @@ export default function InboxPage() {
   const { setCurrentProduct } = useProductContext();
   const { data: entities, isLoading } = useEntities(productId);
   const promoteCapture = usePromoteCapture();
+  const deleteEntity = useDeleteEntity();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
   const filterParam = searchParams.get("filter") as TabValue | null;
   const [activeTab, setActiveTab] = useState<TabValue>(filterParam || "all");
+  const [newItemId, setNewItemId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [entityToDelete, setEntityToDelete] = useState<Entity | null>(null);
 
   useEffect(() => {
     if (productId) setCurrentProduct(productId);
@@ -83,6 +107,7 @@ export default function InboxPage() {
   }, [filterParam]);
 
   const handleTabChange = (value: string) => {
+    if (!value) return;
     setActiveTab(value as TabValue);
     if (value === "all") {
       searchParams.delete("filter");
@@ -99,13 +124,9 @@ export default function InboxPage() {
     
     return entities
       .filter((e) => {
-        // Filter by inbox types
         if (!inboxTypes.includes(e.type)) return false;
-        // For captures, exclude promoted ones
         if (e.type === "capture" && e.promotedToId) return false;
-        // Tab filter
         if (activeTab !== "all" && e.type !== activeTab) return false;
-        // Search filter
         if (search) {
           const searchLower = search.toLowerCase();
           return (
@@ -163,6 +184,30 @@ export default function InboxPage() {
     }
   };
 
+  const handleDeleteClick = (entity: Entity) => {
+    setEntityToDelete(entity);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!entityToDelete) return;
+    try {
+      await deleteEntity.mutateAsync(entityToDelete.id);
+      toast({
+        title: "Deleted",
+        description: `${TYPE_CONFIG[entityToDelete.type]?.label || "Item"} deleted.`,
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete item.",
+        variant: "destructive",
+      });
+    }
+    setDeleteDialogOpen(false);
+    setEntityToDelete(null);
+  };
+
   const getDetailRoute = (entity: Entity) => {
     const routes: Record<string, string> = {
       capture: "captures",
@@ -172,10 +217,16 @@ export default function InboxPage() {
     return `/product/${productId}/${routes[entity.type] || "captures"}/${entity.id}`;
   };
 
+  const handleSaved = (entityId: string) => {
+    setNewItemId(entityId);
+    setTimeout(() => setNewItemId(null), 2000);
+  };
+
   if (isLoading) {
     return (
       <div className="page-container">
         <Skeleton className="mb-6 h-8 w-48" />
+        <Skeleton className="mx-auto mb-8 h-64 max-w-3xl" />
         <Skeleton className="mb-4 h-10 w-full max-w-sm" />
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
@@ -188,23 +239,67 @@ export default function InboxPage() {
 
   return (
     <div className="page-container">
+      {/* Page Header */}
       <div className="page-header">
-        <div className="page-header-row">
-          <div>
-            <h1 className="flex items-center gap-2 text-lg font-semibold">
-              <Inbox className="h-5 w-5 text-muted-foreground" />
-              Inbox
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Captures, feedback, and feature requests
-            </p>
-          </div>
+        <div>
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
+            <Inbox className="h-5 w-5 text-muted-foreground" />
+            Inbox
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Capture and process incoming thoughts
+          </p>
         </div>
       </div>
 
-      {/* Search & Tabs */}
-      <div className="mb-6 space-y-4">
-        <div className="relative max-w-sm">
+      {/* Capture Input Section */}
+      {productId && (
+        <div className="mb-8">
+          <InboxCaptureForm productId={productId} onSaved={handleSaved} />
+        </div>
+      )}
+
+      {/* Divider */}
+      <Separator className="mb-6" />
+
+      {/* Filter Bar */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <ToggleGroup
+          type="single"
+          value={activeTab}
+          onValueChange={handleTabChange}
+          className="justify-start"
+        >
+          <ToggleGroupItem value="all" className="gap-1.5 text-xs">
+            All
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+              {counts.all}
+            </Badge>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="capture" className="gap-1.5 text-xs">
+            <Zap className="h-3 w-3" />
+            Captures
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+              {counts.capture}
+            </Badge>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="feedback" className="gap-1.5 text-xs">
+            <MessageSquare className="h-3 w-3" />
+            Feedback
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+              {counts.feedback}
+            </Badge>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="feature_request" className="gap-1.5 text-xs">
+            <Sparkles className="h-3 w-3" />
+            Requests
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+              {counts.feature_request}
+            </Badge>
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -213,46 +308,17 @@ export default function InboxPage() {
             className="pl-9"
           />
         </div>
-
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value="all" className="gap-1.5">
-              All
-              <Badge variant="secondary" className="ml-1 text-[10px]">
-                {counts.all}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="capture" className="gap-1.5">
-              <Zap className="h-3.5 w-3.5" />
-              Captures
-              <Badge variant="secondary" className="ml-1 text-[10px]">
-                {counts.capture}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="feedback" className="gap-1.5">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Feedback
-              <Badge variant="secondary" className="ml-1 text-[10px]">
-                {counts.feedback}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="feature_request" className="gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" />
-              Requests
-              <Badge variant="secondary" className="ml-1 text-[10px]">
-                {counts.feature_request}
-              </Badge>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
-      {/* List */}
+      {/* Item List */}
       {filteredEntities.length === 0 ? (
         <div className="py-16 text-center">
-          <Inbox className="mx-auto h-10 w-10 text-muted-foreground/50" />
-          <p className="mt-3 text-sm text-muted-foreground">
-            {search ? "No items match your search." : "Your inbox is empty."}
+          <Inbox className="mx-auto h-12 w-12 text-muted-foreground/40" />
+          <h3 className="mt-4 text-sm font-medium text-foreground">Inbox is empty</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {search
+              ? "No items match your search."
+              : "Capture a thought, log feedback, or record a feature request to get started."}
           </p>
         </div>
       ) : (
@@ -260,32 +326,56 @@ export default function InboxPage() {
           {filteredEntities.map((entity) => {
             const config = TYPE_CONFIG[entity.type];
             const Icon = config?.icon || Zap;
+            const isNew = entity.id === newItemId;
+
             return (
               <div
                 key={entity.id}
-                className="group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-border/50 hover:bg-muted/50"
+                className={cn(
+                  "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-all duration-300 hover:border-border/50 hover:bg-muted/50",
+                  isNew && "bg-primary/10 ring-1 ring-primary/20"
+                )}
               >
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted ${config?.color || ""}`}>
+                <div
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted",
+                    config?.color
+                  )}
+                >
                   <Icon className="h-4 w-4" />
                 </div>
-                <Link
-                  to={getDetailRoute(entity)}
-                  className="min-w-0 flex-1"
-                >
+                <Link to={getDetailRoute(entity)} className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">
-                    {entity.title || "Untitled"}
+                    {entity.title || entity.body.slice(0, 60) || "Untitled"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {config?.label} · {formatDistanceToNow(new Date(entity.createdAt), { addSuffix: true })}
+                    {config?.label} ·{" "}
+                    {formatDistanceToNow(new Date(entity.createdAt), { addSuffix: true })}
                   </p>
                 </Link>
                 <div className="flex items-center gap-2">
-                  {entity.status && (
+                  {/* Feedback sentiment indicator */}
+                  {entity.type === "feedback" && entity.metadata?.feedbackType && (
                     <Badge
                       variant="outline"
-                      className={`text-[10px] capitalize ${STATUS_COLORS[entity.status] || ""}`}
+                      className={cn(
+                        "text-[10px] capitalize",
+                        SENTIMENT_STYLES[entity.metadata.feedbackType] || ""
+                      )}
                     >
-                      {entity.status.replace("_", " ")}
+                      {entity.metadata.feedbackType}
+                    </Badge>
+                  )}
+                  {/* Feature request priority badge */}
+                  {entity.type === "feature_request" && entity.metadata?.priority && (
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] capitalize",
+                        PRIORITY_STYLES[entity.metadata.priority] || ""
+                      )}
+                    >
+                      {entity.metadata.priority}
                     </Badge>
                   )}
                   <DropdownMenu>
@@ -299,20 +389,32 @@ export default function InboxPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
-                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                        Promote to...
-                      </div>
+                      <DropdownMenuItem asChild>
+                        <Link to={getDetailRoute(entity)}>Open</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Promote to...</DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {PROMOTE_OPTIONS.map((opt) => (
+                            <DropdownMenuItem
+                              key={opt.type}
+                              onClick={() => handlePromote(entity, opt.type)}
+                              className="gap-2"
+                            >
+                              <opt.icon className="h-3.5 w-3.5" />
+                              {opt.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                       <DropdownMenuSeparator />
-                      {PROMOTE_OPTIONS.map((opt) => (
-                        <DropdownMenuItem
-                          key={opt.type}
-                          onClick={() => handlePromote(entity, opt.type)}
-                          className="gap-2"
-                        >
-                          <opt.icon className="h-3.5 w-3.5" />
-                          {opt.label}
-                        </DropdownMenuItem>
-                      ))}
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteClick(entity)}
+                        className="gap-2 text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -321,6 +423,27 @@ export default function InboxPage() {
           })}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {entityToDelete ? TYPE_CONFIG[entityToDelete.type]?.label : "item"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this item.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
