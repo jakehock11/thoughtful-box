@@ -388,3 +388,12 @@ const data = await window.api.getProducts();
 - Run `npm run build` to verify the app compiles.
 - Use `npm run lint:fix` to auto-fix linting issues.
 - Use `npm run format` to format code with Prettier.
+
+## CI Pipeline
+
+GitHub Actions runs on every push to main and on pull requests:
+- Lint check
+- Build verification
+- Format check
+
+All checks must pass before merging. If CI fails, fix the issues locally before pushing again.
