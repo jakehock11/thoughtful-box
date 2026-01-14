@@ -384,10 +384,11 @@ const data = await window.api.getProducts();
 
 ## Quality Rules
 
+- Pre-commit hook auto-formats staged files with Prettier
+- No need to manually run format before committing
 - Run `npm run lint` before committing. Fix all errors.
 - Run `npm run build` to verify the app compiles.
 - Use `npm run lint:fix` to auto-fix linting issues.
-- Use `npm run format` to format code with Prettier.
 
 ## CI Pipeline
 
