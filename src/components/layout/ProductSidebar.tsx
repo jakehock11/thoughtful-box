@@ -12,7 +12,6 @@ import {
 import { useProductContext } from "@/contexts/ProductContext";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
-import { QuickCaptureButton } from "@/components/quick-capture/QuickCaptureButton";
 
 interface NavItemProps {
   to: string;
@@ -58,11 +57,6 @@ export function ProductSidebar() {
 
       {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto scrollbar-thin p-2">
-        {/* Capture CTA */}
-        <QuickCaptureButton />
-
-        <Separator className="my-3 bg-sidebar-border" />
-
         {/* Bucket Navigation */}
         <div className="space-y-0.5">
           <NavItem to={`${basePath}/inbox`} icon={Inbox} label="Inbox" />
