@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   differenceInDays,
   subMonths,
@@ -43,6 +44,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import type { Entity, EntityType } from "@/lib/types";
 
 // Types
 type TimelineEntityType =
@@ -60,53 +62,27 @@ interface TimelineItem {
   title: string;
   status: string;
   createdAt: string;
+  personaIds: string[];
+  featureIds: string[];
+  dimensionValueIds: string[];
 }
 
 type TimeRangeKey = "1M" | "3M" | "6M" | "1Y" | "3Y" | "all";
 
-// Mock data
-const MOCK_TIMELINE_DATA: TimelineItem[] = [
-  // Problems
-  { id: "p1", type: "problem", title: "User onboarding drop-off at step 3", status: "solved", createdAt: "2025-07-15" },
-  { id: "p2", type: "problem", title: "Checkout friction causing cart abandonment", status: "active", createdAt: "2025-10-20" },
-  { id: "p3", type: "problem", title: "Mobile performance issues on older devices", status: "exploring", createdAt: "2025-12-05" },
-  
-  // Hypotheses
-  { id: "h1", type: "hypothesis", title: "Simpler signup increases conversion by 15%", status: "validated", createdAt: "2025-08-10" },
-  { id: "h2", type: "hypothesis", title: "Social proof builds trust with new users", status: "invalidated", createdAt: "2025-09-25" },
-  { id: "h3", type: "hypothesis", title: "One-click checkout reduces friction", status: "draft", createdAt: "2025-11-30" },
-  
-  // Experiments
-  { id: "e1", type: "experiment", title: "A/B test new signup flow", status: "complete", createdAt: "2025-09-01" },
-  { id: "e2", type: "experiment", title: "Test social badges on product pages", status: "complete", createdAt: "2025-10-15" },
-  { id: "e3", type: "experiment", title: "Express checkout pilot program", status: "running", createdAt: "2025-12-20" },
-  
-  // Decisions
-  { id: "d1", type: "decision", title: "Launch new simplified signup flow", status: "active", createdAt: "2025-10-01" },
-  { id: "d2", type: "decision", title: "Prioritize mobile web performance", status: "active", createdAt: "2025-12-10" },
-  
-  // Features
-  { id: "f1", type: "feature", title: "Social login (Google, GitHub)", status: "shipped", createdAt: "2025-08-20" },
-  { id: "f2", type: "feature", title: "Express checkout flow", status: "building", createdAt: "2025-11-15" },
-  { id: "f3", type: "feature", title: "PWA support for mobile", status: "shipped", createdAt: "2026-01-05" },
-  
-  // Feedback
-  { id: "fb1", type: "feedback", title: "Love the new design! Much cleaner.", status: "new", createdAt: "2025-12-28" },
-  { id: "fb2", type: "feedback", title: "Bug: Submit button unresponsive on Safari", status: "actioned", createdAt: "2025-09-18" },
-  
-  // Feature Requests
-  { id: "fr1", type: "feature_request", title: "Dark mode support", status: "considering", createdAt: "2025-10-05" },
-  { id: "fr2", type: "feature_request", title: "Export reports to PDF", status: "shipped", createdAt: "2025-11-22" },
-];
-
-// Mock filter options
-const MOCK_PERSONAS = ["Power User", "New User", "Admin", "Developer"];
-const MOCK_FEATURE_AREAS = ["Onboarding", "Checkout", "Dashboard", "Settings"];
+interface SwimLaneTimelineProps {
+  productId: string;
+  entities: Entity[];
+  taxonomy: {
+    personas: { id: string; name: string }[];
+    features: { id: string; name: string }[];
+    dimensions: { id: string; name: string; values: { id: string; name: string }[] }[];
+  };
+}
 
 // Config
-const SWIMLANE_CONFIG: Record<TimelineEntityType, { 
-  icon: React.ElementType; 
-  label: string; 
+const SWIMLANE_CONFIG: Record<TimelineEntityType, {
+  icon: React.ElementType;
+  label: string;
   fillColor: string;
   strokeColor: string;
 }> = {
@@ -120,7 +96,7 @@ const SWIMLANE_CONFIG: Record<TimelineEntityType, {
 };
 
 const COMPLETED_STATUSES = [
-  "solved", "validated", "invalidated", "complete", "shipped", 
+  "solved", "validated", "invalidated", "complete", "shipped",
   "stable", "archived", "actioned", "declined", "deprecated"
 ];
 
@@ -130,38 +106,47 @@ const SWIMLANE_ORDER: TimelineEntityType[] = [
   "problem", "hypothesis", "experiment", "decision", "feature", "feedback", "feature_request"
 ];
 
-// Helpers
-const getTimeRangeStart = (range: TimeRangeKey): Date => {
-  const now = new Date();
-  switch (range) {
-    case "1M": return subMonths(now, 1);
-    case "3M": return subMonths(now, 3);
-    case "6M": return subMonths(now, 6);
-    case "1Y": return subYears(now, 1);
-    case "3Y": return subYears(now, 3);
-    case "all": return new Date(Math.min(...MOCK_TIMELINE_DATA.map(d => new Date(d.createdAt).getTime())));
-  }
+// Entity type to route path mapping
+const TYPE_TO_PATH: Record<TimelineEntityType, string> = {
+  problem: "problems",
+  hypothesis: "hypotheses",
+  experiment: "experiments",
+  decision: "decisions",
+  feature: "features",
+  feedback: "feedback",
+  feature_request: "feature-requests",
 };
 
+// Helpers
 const isCompleted = (status: string): boolean => {
   return COMPLETED_STATUSES.includes(status.toLowerCase());
 };
 
 // Multi-select dropdown component
 const MultiSelectDropdown: React.FC<{
-  options: string[];
+  options: { id: string; name: string }[];
   selected: string[];
   onChange: (selected: string[]) => void;
-  placeholder: string;
-}> = ({ options, selected, onChange, placeholder }) => {
+  dimensionName: string;
+}> = ({ options, selected, onChange, dimensionName }) => {
   const [open, setOpen] = useState(false);
 
-  const toggleOption = (option: string) => {
-    if (selected.includes(option)) {
-      onChange(selected.filter(s => s !== option));
+  const toggleOption = (id: string) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter(s => s !== id));
     } else {
-      onChange([...selected, option]);
+      onChange([...selected, id]);
     }
+  };
+
+  const getTriggerText = () => {
+    if (selected.length === 0) return `All ${dimensionName}`;
+    const selectedNames = selected
+      .map(id => options.find(o => o.id === id)?.name)
+      .filter(Boolean) as string[];
+    if (selectedNames.length === 1) return selectedNames[0];
+    if (selectedNames.length <= 3) return selectedNames.join(", ");
+    return `${selectedNames[0]}, ${selectedNames[1]} +${selectedNames.length - 2} more`;
   };
 
   return (
@@ -172,7 +157,7 @@ const MultiSelectDropdown: React.FC<{
           size="sm"
           className="h-8 px-3 text-xs justify-between min-w-[120px]"
         >
-          {selected.length > 0 ? `${selected.length} selected` : placeholder}
+          {getTriggerText()}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
@@ -183,17 +168,17 @@ const MultiSelectDropdown: React.FC<{
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
-                  key={option}
-                  onSelect={() => toggleOption(option)}
+                  key={option.id}
+                  onSelect={() => toggleOption(option.id)}
                   className="cursor-pointer"
                 >
                   <div className={cn(
                     "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                    selected.includes(option) ? "bg-primary text-primary-foreground" : "opacity-50"
+                    selected.includes(option.id) ? "bg-primary text-primary-foreground" : "opacity-50"
                   )}>
-                    {selected.includes(option) && <Check className="h-3 w-3" />}
+                    {selected.includes(option.id) && <Check className="h-3 w-3" />}
                   </div>
-                  {option}
+                  {option.name}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -205,25 +190,86 @@ const MultiSelectDropdown: React.FC<{
 };
 
 // Main component
-export const SwimLaneTimeline: React.FC = () => {
+export const SwimLaneTimeline: React.FC<SwimLaneTimelineProps> = ({
+  productId,
+  entities,
+  taxonomy,
+}) => {
+  const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("6M");
   const [visibleTypes, setVisibleTypes] = useState<TimelineEntityType[]>([...SWIMLANE_ORDER]);
-  const [selectedPersonas, setSelectedPersonas] = useState<string[]>([]);
-  const [selectedFeatureAreas, setSelectedFeatureAreas] = useState<string[]>([]);
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+
+  const updateFilter = (key: string, selected: string[]) => {
+    setFilters(prev => ({ ...prev, [key]: selected }));
+  };
 
   const today = new Date();
-  const timeRangeStart = useMemo(() => getTimeRangeStart(timeRange), [timeRange]);
+
+  // Convert entities to timeline items (filter out captures and artifacts)
+  const timelineData: TimelineItem[] = useMemo(() => {
+    return entities
+      .filter((e): e is Entity & { type: TimelineEntityType } =>
+        SWIMLANE_ORDER.includes(e.type as TimelineEntityType)
+      )
+      .map((e) => ({
+        id: e.id,
+        type: e.type as TimelineEntityType,
+        title: e.title,
+        status: e.status || "",
+        createdAt: e.createdAt,
+        personaIds: e.personaIds || [],
+        featureIds: e.featureIds || [],
+        dimensionValueIds: e.dimensionValueIds || [],
+      }));
+  }, [entities]);
+
+  // Calculate time range start based on data
+  const getTimeRangeStart = (range: TimeRangeKey): Date => {
+    const now = new Date();
+    switch (range) {
+      case "1M": return subMonths(now, 1);
+      case "3M": return subMonths(now, 3);
+      case "6M": return subMonths(now, 6);
+      case "1Y": return subYears(now, 1);
+      case "3Y": return subYears(now, 3);
+      case "all": {
+        if (timelineData.length === 0) return subMonths(now, 6);
+        return new Date(Math.min(...timelineData.map(d => new Date(d.createdAt).getTime())));
+      }
+    }
+  };
+
+  const timeRangeStart = useMemo(() => getTimeRangeStart(timeRange), [timeRange, timelineData]);
   const totalDays = useMemo(() => Math.max(1, differenceInDays(today, timeRangeStart)), [timeRangeStart]);
 
-  // Filter items by visible types and date range
+  // Filter items by visible types, date range, and taxonomy filters
   const filteredItems = useMemo(() => {
-    return MOCK_TIMELINE_DATA.filter(item => {
+    return timelineData.filter(item => {
       const itemDate = new Date(item.createdAt);
       const inDateRange = itemDate >= timeRangeStart && itemDate <= today;
       const typeVisible = visibleTypes.includes(item.type);
-      return inDateRange && typeVisible;
+
+      // Persona filter
+      const personaFilter = filters['personas'] || [];
+      const personaMatch = personaFilter.length === 0 ||
+        personaFilter.some(pid => item.personaIds.includes(pid));
+
+      // Feature filter
+      const featureFilter = filters['features'] || [];
+      const featureMatch = featureFilter.length === 0 ||
+        featureFilter.some(fid => item.featureIds.includes(fid));
+
+      // Custom dimension filters
+      const dimensionMatch = taxonomy.dimensions.every(dim => {
+        const dimFilter = filters[dim.id] || [];
+        if (dimFilter.length === 0) return true;
+        return dimFilter.some(vid => item.dimensionValueIds.includes(vid));
+      });
+
+      return inDateRange && typeVisible && personaMatch && featureMatch && dimensionMatch;
     });
-  }, [visibleTypes, timeRangeStart]);
+  }, [timelineData, visibleTypes, timeRangeStart, filters, taxonomy.dimensions]);
 
   // Group items by type
   const swimlanes = useMemo(() => {
@@ -240,21 +286,18 @@ export const SwimLaneTimeline: React.FC = () => {
   // Calculate grid lines based on time range
   const gridLines = useMemo(() => {
     const interval = { start: timeRangeStart, end: today };
-    
+
     if (timeRange === "1M" || timeRange === "3M") {
-      // Weekly grid lines
       return eachWeekOfInterval(interval).map(date => ({
         date,
         label: format(date, "MMM d"),
       }));
     } else if (timeRange === "6M" || timeRange === "1Y") {
-      // Monthly grid lines
       return eachMonthOfInterval(interval).map(date => ({
         date: startOfMonth(date),
         label: format(date, "MMM"),
       }));
     } else {
-      // Quarterly grid lines
       return eachQuarterOfInterval(interval).map(date => ({
         date: startOfQuarter(date),
         label: format(date, "QQQ yyyy"),
@@ -276,7 +319,8 @@ export const SwimLaneTimeline: React.FC = () => {
   };
 
   const handleNodeClick = (item: TimelineItem) => {
-    console.log("Clicked item ID:", item.id, item);
+    const path = TYPE_TO_PATH[item.type];
+    navigate(`/product/${productId}/${path}/${item.id}`);
   };
 
   const visibleSwimlanes = SWIMLANE_ORDER.filter(type => visibleTypes.includes(type));
@@ -289,17 +333,26 @@ export const SwimLaneTimeline: React.FC = () => {
           {/* Filter bar */}
           <div className="flex items-center gap-3 flex-wrap">
             <MultiSelectDropdown
-              options={MOCK_PERSONAS}
-              selected={selectedPersonas}
-              onChange={setSelectedPersonas}
-              placeholder="All Personas"
+              options={taxonomy.personas}
+              selected={filters['personas'] || []}
+              onChange={(sel) => updateFilter('personas', sel)}
+              dimensionName="Personas"
             />
             <MultiSelectDropdown
-              options={MOCK_FEATURE_AREAS}
-              selected={selectedFeatureAreas}
-              onChange={setSelectedFeatureAreas}
-              placeholder="All Features"
+              options={taxonomy.features}
+              selected={filters['features'] || []}
+              onChange={(sel) => updateFilter('features', sel)}
+              dimensionName="Feature Areas"
             />
+            {taxonomy.dimensions.map(dim => (
+              <MultiSelectDropdown
+                key={dim.id}
+                options={dim.values}
+                selected={filters[dim.id] || []}
+                onChange={(sel) => updateFilter(dim.id, sel)}
+                dimensionName={dim.name}
+              />
+            ))}
             <div className="h-5 w-px bg-border" />
             <div className="flex items-center gap-1.5 flex-wrap">
               {SWIMLANE_ORDER.map(type => {
@@ -312,13 +365,13 @@ export const SwimLaneTimeline: React.FC = () => {
                     onClick={() => toggleType(type)}
                     className={cn(
                       "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors",
-                      isActive 
-                        ? "bg-secondary text-secondary-foreground" 
+                      isActive
+                        ? "bg-secondary text-secondary-foreground"
                         : "text-muted-foreground hover:bg-muted"
                     )}
                   >
-                    <Checkbox 
-                      checked={isActive} 
+                    <Checkbox
+                      checked={isActive}
                       className="h-3.5 w-3.5 pointer-events-none"
                     />
                     <Icon className="h-3.5 w-3.5" />
@@ -415,8 +468,8 @@ export const SwimLaneTimeline: React.FC = () => {
                                     r="5"
                                     className={cn(
                                       "transition-colors",
-                                      filled 
-                                        ? config.fillColor 
+                                      filled
+                                        ? config.fillColor
                                         : "fill-transparent",
                                       config.strokeColor,
                                       "stroke-2"
@@ -430,9 +483,11 @@ export const SwimLaneTimeline: React.FC = () => {
                                 <p className="font-medium text-sm leading-tight">{item.title}</p>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                   <span>{format(new Date(item.createdAt), "MMM d, yyyy")}</span>
-                                  <Badge variant="secondary" className="h-4 text-[10px] px-1.5">
-                                    {item.status}
-                                  </Badge>
+                                  {item.status && (
+                                    <Badge variant="secondary" className="h-4 text-[10px] px-1.5">
+                                      {item.status}
+                                    </Badge>
+                                  )}
                                 </div>
                               </div>
                             </TooltipContent>

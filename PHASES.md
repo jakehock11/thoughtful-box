@@ -8,7 +8,7 @@ This document contains the prompts to give Claude Code for each build phase. Run
 
 1. **Clone the Lovable prototype repo:**
    ```bash
-   git clone https://github.com/jakehock11/thoughtful-box.git product-os
+   git clone https://github.com/jakehock11/product-os.git product-os
    cd product-os
    ```
 
