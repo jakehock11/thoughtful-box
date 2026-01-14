@@ -23,13 +23,16 @@ import { useProducts } from "@/hooks/useProducts";
 import { useEntities } from "@/hooks/useEntities";
 import type { Entity, EntityType, Product } from "@/lib/types";
 
-const TYPE_CONFIG: Record<EntityType, { icon: React.ElementType; label: string; route: string }> = {
+const TYPE_CONFIG: Partial<Record<EntityType, { icon: React.ElementType; label: string; route: string }>> = {
   problem: { icon: AlertCircle, label: "Problem", route: "problems" },
   hypothesis: { icon: Lightbulb, label: "Hypothesis", route: "hypotheses" },
   experiment: { icon: FlaskConical, label: "Experiment", route: "experiments" },
   decision: { icon: CheckCircle, label: "Decision", route: "decisions" },
   artifact: { icon: Paperclip, label: "Artifact", route: "artifacts" },
   capture: { icon: Zap, label: "Capture", route: "captures" },
+  feedback: { icon: Box, label: "Feedback", route: "feedback" },
+  feature_request: { icon: Box, label: "Request", route: "feature-requests" },
+  feature: { icon: Box, label: "Feature", route: "features" },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -159,10 +162,12 @@ export function CommandPalette() {
         {/* Entities grouped by type */}
         {Object.entries(groupedEntities).map(([type, items]) => {
           const config = TYPE_CONFIG[type as EntityType];
+          if (!config) return null;
           const Icon = config.icon;
+          const entityItems = items as Entity[];
           return (
             <CommandGroup key={type} heading={`${config.label}s`}>
-              {items.map((entity) => (
+              {entityItems.map((entity) => (
                 <CommandItem
                   key={entity.id}
                   value={`entity-${entity.id}`}

@@ -34,13 +34,16 @@ import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import type { ExportOptions, ExportMode, EntityType } from "@/lib/types";
 
-const TYPE_LABELS: Record<EntityType, string> = {
+const TYPE_LABELS: Record<string, string> = {
   capture: "Captures",
   problem: "Problems",
   hypothesis: "Hypotheses",
   experiment: "Experiments",
   decision: "Decisions",
   artifact: "Artifacts",
+  feedback: "Feedback",
+  feature_request: "Requests",
+  feature: "Features",
 };
 
 export default function ExportsPage() {

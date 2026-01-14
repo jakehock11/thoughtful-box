@@ -77,7 +77,7 @@ export default function SettingsPage() {
     if (!product || !name.trim()) return;
     setIsSaving(true);
     try {
-      await updateProduct.mutateAsync({ ...product, name: name.trim() });
+      await updateProduct.mutateAsync({ id: product.id, data: { name: name.trim() } });
       toast({ title: "Saved", description: "Product name updated." });
     } catch {
       toast({ title: "Error", description: "Failed to update product name.", variant: "destructive" });

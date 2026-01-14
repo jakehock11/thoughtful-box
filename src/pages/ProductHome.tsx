@@ -73,13 +73,16 @@ export default function ProductHome() {
         description: `Capture promoted to ${targetType}.`,
       });
       // Navigate to the new entity
-      const pathMap: Record<EntityType, string> = {
+      const pathMap: Record<string, string> = {
         problem: "problems",
         hypothesis: "hypotheses",
         experiment: "experiments",
         decision: "decisions",
         artifact: "artifacts",
         capture: "captures",
+        feedback: "feedback",
+        feature_request: "feature-requests",
+        feature: "features",
       };
       navigate(`/product/${productId}/${pathMap[targetType]}/${newEntity.id}`);
     } catch {

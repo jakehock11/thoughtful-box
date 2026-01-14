@@ -23,13 +23,16 @@ import { formatDistanceToNow } from "date-fns";
 import type { Entity, EntityType, RelationshipType } from "@/lib/types";
 import { RELATIONSHIP_TYPES } from "@/lib/types";
 
-const TYPE_CONFIG: Record<EntityType, { icon: React.ElementType; label: string }> = {
+const TYPE_CONFIG: Partial<Record<EntityType, { icon: React.ElementType; label: string }>> = {
   problem: { icon: AlertCircle, label: "Problem" },
   hypothesis: { icon: Lightbulb, label: "Hypothesis" },
   experiment: { icon: FlaskConical, label: "Experiment" },
   decision: { icon: CheckCircle, label: "Decision" },
   artifact: { icon: Paperclip, label: "Artifact" },
   capture: { icon: Zap, label: "Capture" },
+  feedback: { icon: Zap, label: "Feedback" },
+  feature_request: { icon: Zap, label: "Request" },
+  feature: { icon: Zap, label: "Feature" },
 };
 
 export interface LinkToModalProps {

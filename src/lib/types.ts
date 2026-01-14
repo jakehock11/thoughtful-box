@@ -2,7 +2,16 @@
 // Entity Types
 // ============================================
 
-export type EntityType = 'capture' | 'problem' | 'hypothesis' | 'experiment' | 'decision' | 'artifact';
+export type EntityType = 
+  | 'capture' 
+  | 'problem' 
+  | 'hypothesis' 
+  | 'experiment' 
+  | 'decision' 
+  | 'artifact'
+  | 'feedback'
+  | 'feature_request'
+  | 'feature';
 
 // Status values per entity type
 export type ProblemStatus = 'active' | 'exploring' | 'blocked' | 'solved' | 'archived';
@@ -11,6 +20,22 @@ export type ExperimentStatus = 'planned' | 'running' | 'paused' | 'complete' | '
 export type ArtifactStatus = 'draft' | 'final' | 'archived';
 export type DecisionType = 'reversible' | 'irreversible';
 export type ExperimentOutcome = 'validated' | 'invalidated' | 'inconclusive';
+
+// New entity status types
+export type FeedbackType = 'praise' | 'complaint' | 'bug' | 'suggestion' | 'question';
+export type FeedbackStatus = 'new' | 'reviewed' | 'actioned' | 'archived';
+export type FeatureRequestStatus = 'new' | 'considering' | 'planned' | 'in_progress' | 'shipped' | 'declined';
+export type FeatureRequestPriority = 'low' | 'medium' | 'high' | 'critical';
+export type FeatureStatus = 'building' | 'shipped' | 'monitoring' | 'stable' | 'deprecated';
+export type FeatureHealth = 'healthy' | 'needs_attention' | 'underperforming';
+
+// Feature check-in for tracking health over time
+export interface FeatureCheckIn {
+  id: string;
+  date: string;
+  health: FeatureHealth;
+  notes: string;
+}
 
 // ============================================
 // Product
@@ -103,6 +128,16 @@ export interface EntityMetadata {
   // Artifact
   artifactType?: string;
   source?: string;
+  sourceUrl?: string;
+  // Feedback
+  feedbackType?: FeedbackType;
+  // Feature Request
+  priority?: FeatureRequestPriority;
+  declinedReason?: string;
+  // Feature
+  health?: FeatureHealth;
+  shippedAt?: string;
+  checkIns?: FeatureCheckIn[];
 }
 
 export interface Entity {
@@ -145,6 +180,7 @@ export interface UpdateEntityData {
 
 export interface EntityFilters {
   type?: EntityType;
+  types?: EntityType[];
   status?: string;
   search?: string;
 }
@@ -300,3 +336,16 @@ export interface WorkspaceConfiguredResult {
   configured: boolean;
   error?: string;
 }
+
+// ============================================
+// Bucket Types (for navigation)
+// ============================================
+
+export type BucketType = 'inbox' | 'thinking' | 'work' | 'evidence';
+
+export const BUCKET_ENTITY_TYPES: Record<BucketType, EntityType[]> = {
+  inbox: ['capture', 'feedback', 'feature_request'],
+  thinking: ['problem', 'hypothesis'],
+  work: ['experiment', 'decision', 'feature'],
+  evidence: ['artifact'],
+};
