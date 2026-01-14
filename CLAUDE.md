@@ -351,3 +351,31 @@ function useEntities(productId: string, type?: EntityType) {
 - Keyboard shortcuts beyond Cmd/Ctrl+K (search) and Cmd/Ctrl+N (capture)
 - Full-text search in SQLite (basic LIKE queries are fine)
 - File attachments for artifacts (just notes/links for now)
+
+---
+
+## Mock Layer (Browser Preview)
+
+The app has a mock API layer that enables browser preview (for Lovable). Located in:
+
+- `src/mocks/mockData.ts` - Sample data for all entity types
+- `src/mocks/mockStore.ts` - Mock implementation of API interface
+- `src/lib/ipc.ts` - Conditionally exports real or mock API
+
+### Rules
+
+1. **DO NOT delete** the mocks folder or ipc.ts mock integration
+2. **When adding new API methods**: add to both real IPC (electron/preload.ts, electron/main.ts) AND mockStore.ts
+3. **When adding new entity types**: add sample data to mockData.ts
+4. **Always import from `@/lib/ipc`**, never use `window.api` directly in React components
+5. **Keep mock data realistic** - use SidelineHD context (sports livestreaming)
+
+### Import Pattern
+```ts
+// ✅ Correct
+import { api } from '@/lib/ipc';
+const data = await api.getProducts();
+
+// ❌ Wrong - breaks browser preview
+const data = await window.api.getProducts();
+```

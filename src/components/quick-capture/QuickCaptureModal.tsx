@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Zap, Link2, Search, AlertCircle, Lightbulb, FlaskConical, CheckCircle, Paperclip, X, Loader2 } from "lucide-react";
+import { Zap, Link2, Search, AlertCircle, Lightbulb, FlaskConical, CheckCircle, Paperclip, X, Loader2, MessageSquare, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -59,6 +59,10 @@ export function QuickCaptureModal({ open, onOpenChange }: QuickCaptureModalProps
   const [dimensionValueIds, setDimensionValueIds] = useState<string[]>([]);
   const [pendingLinks, setPendingLinks] = useState<PendingLink[]>([]);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [entityType, setEntityType] = useState<'capture' | 'feedback' | 'feature_request'>('capture');
+  const [source, setSource] = useState("");
+  const [sentiment, setSentiment] = useState<'positive' | 'neutral' | 'negative' | null>(null);
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null);
 
   const { currentProductId } = useProductContext();
   const createEntity = useCreateEntity();
@@ -73,21 +77,33 @@ export function QuickCaptureModal({ open, onOpenChange }: QuickCaptureModalProps
     setDimensionValueIds([]);
     setPendingLinks([]);
     setLinkPickerOpen(false);
+    setEntityType('capture');
+    setSource("");
+    setSentiment(null);
+    setPriority(null);
   };
 
   const handleSubmit = async () => {
     if (!title.trim() || !currentProductId) return;
 
     try {
-      // Create the capture
+      // Build metadata based on entity type
+      const metadata = entityType === 'feedback'
+        ? { source: source.trim() || undefined, sentiment: sentiment || undefined }
+        : entityType === 'feature_request'
+        ? { source: source.trim() || undefined, priority: priority || undefined }
+        : undefined;
+
+      // Create the entity
       const newEntity = await createEntity.mutateAsync({
-        type: "capture",
+        type: entityType,
         productId: currentProductId,
         title: title.trim(),
         body: body.trim(),
         personaIds,
         featureIds,
         dimensionValueIds,
+        metadata,
       });
 
       // Create relationships for pending links
@@ -104,10 +120,12 @@ export function QuickCaptureModal({ open, onOpenChange }: QuickCaptureModalProps
         }
       }
 
-      toast({
-        title: "Captured!",
-        description: "Your thought has been saved.",
-      });
+      const toastMessages: Record<string, { title: string; description: string }> = {
+        capture: { title: "Captured!", description: "Your thought has been saved." },
+        feedback: { title: "Feedback saved!", description: "Your feedback has been recorded." },
+        feature_request: { title: "Request saved!", description: "Your feature request has been recorded." },
+      };
+      toast(toastMessages[entityType]);
 
       resetForm();
       onOpenChange(false);
@@ -144,12 +162,110 @@ export function QuickCaptureModal({ open, onOpenChange }: QuickCaptureModalProps
       <DialogContent className="sm:max-w-[600px] p-0 gap-0">
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <Zap className="h-4 w-4 text-primary" />
-            New Capture
+            {entityType === 'capture' && <Zap className="h-4 w-4 text-yellow-500" />}
+            {entityType === 'feedback' && <MessageSquare className="h-4 w-4 text-blue-500" />}
+            {entityType === 'feature_request' && <Sparkles className="h-4 w-4 text-purple-500" />}
+            {entityType === 'capture' ? 'New Capture' : entityType === 'feedback' ? 'New Feedback' : 'New Request'}
           </DialogTitle>
         </DialogHeader>
 
         <div className="px-6 py-5 space-y-5">
+          {/* Entity Type Selector */}
+          <div className="flex gap-1 rounded-lg border border-border p-1 bg-muted/30">
+            <Button
+              type="button"
+              variant={entityType === 'capture' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="flex-1 gap-1.5 h-8"
+              onClick={() => setEntityType('capture')}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Capture
+            </Button>
+            <Button
+              type="button"
+              variant={entityType === 'feedback' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="flex-1 gap-1.5 h-8"
+              onClick={() => setEntityType('feedback')}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Feedback
+            </Button>
+            <Button
+              type="button"
+              variant={entityType === 'feature_request' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="flex-1 gap-1.5 h-8"
+              onClick={() => setEntityType('feature_request')}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Request
+            </Button>
+          </div>
+
+          {/* Feedback-specific fields */}
+          {entityType === 'feedback' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Source</Label>
+                <Input
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="Who or where is this from?"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Sentiment</Label>
+                <div className="flex gap-1">
+                  {(['positive', 'neutral', 'negative'] as const).map((s) => (
+                    <Button
+                      key={s}
+                      type="button"
+                      variant={sentiment === s ? 'secondary' : 'outline'}
+                      size="sm"
+                      className="flex-1 capitalize"
+                      onClick={() => setSentiment(sentiment === s ? null : s)}
+                    >
+                      {s}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Feature Request-specific fields */}
+          {entityType === 'feature_request' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Source</Label>
+                <Input
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="Who requested this?"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Priority</Label>
+                <div className="flex gap-1">
+                  {(['low', 'medium', 'high', 'critical'] as const).map((p) => (
+                    <Button
+                      key={p}
+                      type="button"
+                      variant={priority === p ? 'secondary' : 'outline'}
+                      size="sm"
+                      className="flex-1 capitalize text-xs"
+                      onClick={() => setPriority(priority === p ? null : p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Title Field */}
           <div className="space-y-2">
             <Label htmlFor="capture-title" className="text-sm font-medium">

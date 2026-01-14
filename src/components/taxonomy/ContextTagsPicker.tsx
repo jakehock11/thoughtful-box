@@ -74,10 +74,10 @@ export function ContextTagsPicker({
         />
       )}
 
-      {/* Features */}
+      {/* Feature Areas */}
       {activeFeatures.length > 0 && (
         <TagSection
-          label="Features"
+          label="Feature Areas"
           items={activeFeatures}
           selectedIds={featureIds}
           onChange={onFeaturesChange}

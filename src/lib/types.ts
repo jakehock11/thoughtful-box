@@ -23,6 +23,7 @@ export type ExperimentOutcome = 'validated' | 'invalidated' | 'inconclusive';
 
 // New entity status types
 export type FeedbackType = 'praise' | 'complaint' | 'bug' | 'suggestion' | 'question';
+export type FeedbackSentiment = 'positive' | 'neutral' | 'negative';
 export type FeedbackStatus = 'new' | 'reviewed' | 'actioned' | 'archived';
 export type FeatureRequestStatus = 'new' | 'considering' | 'planned' | 'in_progress' | 'shipped' | 'declined';
 export type FeatureRequestPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -131,6 +132,7 @@ export interface EntityMetadata {
   sourceUrl?: string;
   // Feedback
   feedbackType?: FeedbackType;
+  sentiment?: FeedbackSentiment;
   // Feature Request
   priority?: FeatureRequestPriority;
   declinedReason?: string;
