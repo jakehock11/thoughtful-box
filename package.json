@@ -129,6 +129,7 @@
       "icon": "build/icon.ico",
       "signAndEditExecutable": false
     },
+    "afterPack": "./scripts/after-pack.cjs",
     "linux": {
       "target": "AppImage"
     },
